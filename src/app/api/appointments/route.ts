@@ -11,11 +11,11 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const parsed = queryAppointmentsSchema.safeParse({
-    providerId: searchParams.get("providerId"),
-    patientId: searchParams.get("patientId"),
-    dateFrom: searchParams.get("dateFrom"),
-    dateTo: searchParams.get("dateTo"),
-    status: searchParams.get("status"),
+    providerId: searchParams.get("providerId") ?? undefined,
+    patientId: searchParams.get("patientId") ?? undefined,
+    dateFrom: searchParams.get("dateFrom") ?? undefined,
+    dateTo: searchParams.get("dateTo") ?? undefined,
+    status: searchParams.get("status") ?? undefined,
   });
 
   if (!parsed.success) {
