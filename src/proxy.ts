@@ -26,10 +26,11 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth;
 
-  const publicPaths = ["/login", "/register", "/api"];
+  const isApiRoute = pathname.startsWith("/api");
+  const publicPaths = ["/login", "/register"];
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
 
-  if (!isLoggedIn && !isPublic) {
+  if (!isLoggedIn && !isPublic && !isApiRoute) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -37,7 +38,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  if (isLoggedIn && req.auth?.user) {
+  if (isLoggedIn && req.auth?.user && !isApiRoute) {
     const role = req.auth.user.role as Role;
     if (!hasAccess(pathname, role)) {
       return NextResponse.redirect(new URL("/dashboard", req.url));

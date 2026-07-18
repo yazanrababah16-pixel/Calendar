@@ -3,10 +3,9 @@
 import {
   createContext,
   useContext,
-  useState,
   useCallback,
   useEffect,
-  useMemo,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { Locale } from "./translations";
@@ -21,25 +20,41 @@ type LocaleContextValue = {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-function getInitialLocale(): Locale {
-  if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem("locale");
-  if (stored === "ar" || stored === "en") return stored;
-  return navigator.language.startsWith("ar") ? "ar" : "en";
+function getSnapshot(): Locale {
+  try {
+    const stored = localStorage.getItem("locale");
+    if (stored === "ar" || stored === "en") return stored;
+  } catch {
+    /* noop */
+  }
+  return "en";
+}
+
+function subscribe(cb: () => void): () => void {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+}
+
+function getServerSnapshot(): Locale {
+  return "en";
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
-
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    localStorage.setItem("locale", next);
-  }, []);
+  const locale = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
     document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = locale;
   }, [locale]);
+
+  const setLocale = useCallback((next: Locale) => {
+    try {
+      localStorage.setItem("locale", next);
+    } catch {
+      /* noop */
+    }
+    window.dispatchEvent(new StorageEvent("storage", { key: "locale", newValue: next }));
+  }, []);
 
   const dir = locale === "ar" ? "rtl" : "ltr";
   const t = useCallback((key: string) => translate(key, locale), [locale]);
