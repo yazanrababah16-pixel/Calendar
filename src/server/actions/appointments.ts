@@ -104,3 +104,81 @@ export async function cancelAppointment(id: string): Promise<ActionResult> {
 
   return { success: true, id };
 }
+
+export async function updateAppointment(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const id = formData.get("id") as string;
+  if (!id) return { success: false, error: "Appointment ID is required" };
+
+  const existing = await db.appointment.findUnique({ where: { id } });
+  if (!existing) return { success: false, error: "Appointment not found" };
+
+  const parsed = createAppointmentSchema.safeParse({
+    providerId: formData.get("providerId"),
+    patientId: formData.get("patientId"),
+    startTime: formData.get("startTime"),
+    endTime: formData.get("endTime"),
+    title: formData.get("title") || undefined,
+    notes: formData.get("notes") || undefined,
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues?.[0];
+    return { success: false, error: issue?.message ?? "Invalid input" };
+  }
+
+  const { providerId, patientId, startTime, endTime, title, notes } = parsed.data;
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+
+  if (start >= end) {
+    return { success: false, error: "Start time must be before end time" };
+  }
+
+  const overlapping = await db.appointment.findFirst({
+    where: {
+      id: { not: id },
+      providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      OR: [{ startTime: { lt: end }, endTime: { gt: start } }],
+    },
+  });
+
+  if (overlapping) {
+    return { success: false, error: "Updated time slot overlaps with an existing appointment" };
+  }
+
+  await db.appointment.update({
+    where: { id },
+    data: {
+      providerId,
+      patientId,
+      startTime: start,
+      endTime: end,
+      title: title ?? null,
+      notes: notes ?? null,
+    },
+  });
+
+  return { success: true, id };
+}
+
+export async function deleteAppointment(id: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const existing = await db.appointment.findUnique({ where: { id } });
+  if (!existing) return { success: false, error: "Appointment not found" };
+
+  await db.appointment.delete({ where: { id } });
+  return { success: true, id };
+}

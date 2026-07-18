@@ -1,5 +1,6 @@
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 import pg from "pg";
 
 const pool = new pg.Pool({
@@ -11,6 +12,8 @@ const db = new PrismaClient({ adapter });
 async function main() {
   console.log("Seeding database...");
 
+  const passwordHash = await bcrypt.hash("password123", 12);
+
   const adminUser = await db.user.upsert({
     where: { email: "admin@clinic.com" },
     update: {},
@@ -18,6 +21,7 @@ async function main() {
       email: "admin@clinic.com",
       name: "Admin User",
       role: "ADMIN",
+      passwordHash,
     },
   });
   console.log("Admin user:", adminUser.id);
@@ -29,6 +33,7 @@ async function main() {
       email: "doctor@clinic.com",
       name: "Dr. Sarah Smith",
       role: "PROVIDER",
+      passwordHash,
     },
   });
   console.log("Provider user:", providerUser.id);
@@ -52,6 +57,7 @@ async function main() {
       email: "reception@clinic.com",
       name: "Jane Receptionist",
       role: "RECEPTIONIST",
+      passwordHash,
     },
   });
   console.log("Receptionist user:", receptionistUser.id);
@@ -63,6 +69,7 @@ async function main() {
       email: "patient@example.com",
       name: "John Patient",
       role: "PATIENT",
+      passwordHash,
     },
   });
   console.log("Patient user:", patientUser.id);

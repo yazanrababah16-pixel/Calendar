@@ -9,7 +9,12 @@ import { useSession } from "next-auth/react";
 
 import { providersQuery } from "@/lib/queries/providers";
 import { patientsQuery } from "@/lib/queries/patients";
-import { bookAppointment, cancelAppointment } from "@/server/actions/appointments";
+import {
+  bookAppointment,
+  cancelAppointment,
+  updateAppointment,
+  deleteAppointment,
+} from "@/server/actions/appointments";
 
 import {
   Dialog,
@@ -78,6 +83,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const role = session?.user?.role;
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const { toast } = useToast();
 
@@ -114,6 +120,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     async (data: BookingFormData) => {
       setError(null);
       const formData = new FormData();
+      if (appointment) formData.set("id", appointment.id);
       formData.set("patientId", data.patientId);
       formData.set("providerId", data.providerId);
       formData.set("startTime", new Date(data.startTime).toISOString());
@@ -121,20 +128,29 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
       if (data.title) formData.set("title", data.title);
       if (data.notes) formData.set("notes", data.notes);
 
-      const result = await bookAppointment(null, formData);
+      const result = appointment
+        ? await updateAppointment(null, formData)
+        : await bookAppointment(null, formData);
 
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["appointments"] });
         reset();
         setError(null);
         onOpenChange(false);
-        toast({ title: "Appointment booked", type: "success" });
+        toast({
+          title: appointment ? "Appointment updated" : "Appointment booked",
+          type: "success",
+        });
       } else {
         setError(result.error);
-        toast({ title: "Booking failed", description: result.error, type: "error" });
+        toast({
+          title: appointment ? "Update failed" : "Booking failed",
+          description: result.error,
+          type: "error",
+        });
       }
     },
-    [queryClient, reset, onOpenChange, toast],
+    [appointment, queryClient, reset, onOpenChange, toast],
   );
 
   const handleCancel = useCallback(async () => {
@@ -155,6 +171,24 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     }
   }, [appointment, queryClient, onOpenChange, toast]);
 
+  const handleDelete = useCallback(async () => {
+    if (!appointment) return;
+    setError(null);
+    setDeleting(true);
+    const result = await deleteAppointment(appointment.id);
+    setDeleting(false);
+
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setError(null);
+      onOpenChange(false);
+      toast({ title: "Appointment deleted", type: "success" });
+    } else {
+      setError(result.error);
+      toast({ title: "Delete failed", description: result.error, type: "error" });
+    }
+  }, [appointment, queryClient, onOpenChange, toast]);
+
   const handlePatientCreated = useCallback(
     (newPatientId: string) => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
@@ -168,8 +202,9 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     [queryClient, setValue, toast],
   );
 
-  const showProviderSelect = role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER";
-  const canEdit = role === "ADMIN" || role === "RECEPTIONIST";
+  const showProviderSelect =
+    role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit;
+  const canEdit = !isEdit || role === "ADMIN" || role === "RECEPTIONIST";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -345,10 +380,20 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
             >
               {isEdit ? "Close" : "Cancel"}
             </Button>
-            {isEdit && canCancel && (
+            {isEdit && canEdit && (
               <Button
                 type="button"
                 variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete Appointment"}
+              </Button>
+            )}
+            {isEdit && canCancel && (
+              <Button
+                type="button"
+                variant="secondary"
                 onClick={handleCancel}
                 disabled={cancelling}
               >

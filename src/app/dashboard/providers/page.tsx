@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { providersQuery } from "@/lib/queries/providers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Stethoscope, Mail, Phone, CheckCircle, XCircle } from "lucide-react";
+import { AddProviderDialog } from "@/components/providers/add-provider-dialog";
+import { Stethoscope, Mail, Phone, CheckCircle, XCircle, Plus } from "lucide-react";
 
 export default function ProvidersPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { data: providers, isLoading } = useQuery(providersQuery({ isActive: true }));
 
   if (isLoading) {
@@ -25,9 +29,15 @@ export default function ProvidersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Providers</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage healthcare providers</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Providers</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Manage healthcare providers</p>
+        </div>
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-1 size-4" />
+          Add Provider
+        </Button>
       </div>
 
       {!providers || providers.length === 0 ? (
@@ -81,6 +91,8 @@ export default function ProvidersPage() {
           ))}
         </div>
       )}
+
+      <AddProviderDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
