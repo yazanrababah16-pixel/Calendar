@@ -6,18 +6,27 @@ import Link from "next/link";
 import { patientsQuery } from "@/lib/queries/patients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Mail, Search } from "lucide-react";
+import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
+import { Users, Mail, Search, Plus } from "lucide-react";
 
 export default function PatientsPage() {
   const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { data: patients, isLoading } = useQuery(patientsQuery(search || undefined));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Patients</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Search and manage patients</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Patients</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Search and manage patients</p>
+        </div>
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-1 size-4" />
+          Add Patient
+        </Button>
       </div>
 
       <div className="relative">
@@ -43,6 +52,11 @@ export default function PatientsPage() {
             <p className="text-sm text-muted-foreground">
               {search ? "No patients match your search" : "No patients found"}
             </p>
+            {!search && (
+              <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+                Add your first patient
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -69,6 +83,8 @@ export default function PatientsPage() {
           ))}
         </div>
       )}
+
+      <AddPatientDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
