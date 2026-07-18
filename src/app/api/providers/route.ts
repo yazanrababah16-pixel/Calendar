@@ -11,8 +11,8 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const parsed = queryProvidersSchema.safeParse({
-    isActive: searchParams.get("isActive"),
-    specialty: searchParams.get("specialty"),
+    isActive: searchParams.get("isActive") ?? undefined,
+    specialty: searchParams.get("specialty") ?? undefined,
   });
 
   if (!parsed.success) {
