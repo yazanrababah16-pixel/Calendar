@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { Calendar, LayoutDashboard, Users, Stethoscope, Settings, Clock } from "lucide-react";
 
 type NavItem = {
-  label: string;
+  labelKey: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   roles: string[];
@@ -15,37 +16,37 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   {
-    label: "Dashboard",
+    labelKey: "nav.dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   },
   {
-    label: "Calendar",
+    labelKey: "nav.calendar",
     href: "/dashboard/calendar",
     icon: Calendar,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST"],
   },
   {
-    label: "Appointments",
+    labelKey: "nav.appointments",
     href: "/dashboard/appointments",
     icon: Clock,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   },
   {
-    label: "Patients",
+    labelKey: "nav.patients",
     href: "/dashboard/patients",
     icon: Users,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST"],
   },
   {
-    label: "Providers",
+    labelKey: "nav.providers",
     href: "/dashboard/providers",
     icon: Stethoscope,
     roles: ["ADMIN"],
   },
   {
-    label: "Settings",
+    labelKey: "nav.settings",
     href: "/dashboard/settings",
     icon: Settings,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST"],
@@ -56,6 +57,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
+  const { t } = useLocale();
 
   const visible = navItems.filter((item) => !role || item.roles.includes(role));
 
@@ -64,7 +66,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
           <Calendar className="size-5" />
-          <span>Clinic Calendar</span>
+          <span>{t("app.name")}</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-1 p-3">
@@ -82,8 +84,8 @@ export function Sidebar() {
                   : "text-sidebar-foreground",
               )}
             >
-              <Icon className="size-4" />
-              {item.label}
+              <Icon className="size-4 shrink-0" />
+              {t(item.labelKey)}
             </Link>
           );
         })}
