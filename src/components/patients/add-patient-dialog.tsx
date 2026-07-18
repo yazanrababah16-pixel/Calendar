@@ -31,9 +31,10 @@ type AddPatientFormData = z.infer<typeof addPatientSchema>;
 type AddPatientDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onPatientCreated?: (patientId: string) => void;
 };
 
-export function AddPatientDialog({ open, onOpenChange }: AddPatientDialogProps) {
+export function AddPatientDialog({ open, onOpenChange, onPatientCreated }: AddPatientDialogProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export function AddPatientDialog({ open, onOpenChange }: AddPatientDialogProps) 
         reset();
         setError(null);
         onOpenChange(false);
+        onPatientCreated?.(result.id);
         toast({
           title: "Patient added",
           description: "Patient has been created successfully.",

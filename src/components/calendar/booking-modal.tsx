@@ -22,7 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toaster";
-import { Bell, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
+import { Bell, CheckCircle2, Clock, XCircle, Plus } from "lucide-react";
 import type { WorkflowEventInfo } from "@/lib/queries/appointments";
 
 const bookingFormSchema = z.object({
@@ -77,6 +78,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const role = session?.user?.role;
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [addPatientOpen, setAddPatientOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: providers } = useQuery(providersQuery({ isActive: true }));
@@ -94,6 +96,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingFormSchema),
@@ -151,6 +154,19 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
       toast({ title: "Cancellation failed", description: result.error, type: "error" });
     }
   }, [appointment, queryClient, onOpenChange, toast]);
+
+  const handlePatientCreated = useCallback(
+    (newPatientId: string) => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      setValue("patientId", newPatientId);
+      toast({
+        title: "Patient added",
+        description: "New patient selected for booking.",
+        type: "success",
+      });
+    },
+    [queryClient, setValue, toast],
+  );
 
   const showProviderSelect = role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER";
   const canEdit = role === "ADMIN" || role === "RECEPTIONIST";
@@ -215,19 +231,32 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="patientId">Patient</Label>
-            <select
-              id="patientId"
-              {...register("patientId")}
-              disabled={isEdit && !canEdit}
-              className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Select a patient...</option>
-              {patients?.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.user.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                id="patientId"
+                {...register("patientId")}
+                disabled={isEdit && !canEdit}
+                className="flex h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Select a patient...</option>
+                {patients?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.user.name}
+                  </option>
+                ))}
+              </select>
+              {(!isEdit || canEdit) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAddPatientOpen(true)}
+                  title="Add new patient"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              )}
+            </div>
             {errors.patientId && (
               <p className="text-xs text-destructive">{errors.patientId.message}</p>
             )}
@@ -333,6 +362,12 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
             )}
           </div>
         </form>
+
+        <AddPatientDialog
+          open={addPatientOpen}
+          onOpenChange={setAddPatientOpen}
+          onPatientCreated={handlePatientCreated}
+        />
       </DialogContent>
     </Dialog>
   );
