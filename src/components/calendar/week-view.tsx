@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
-const HOURS = Array.from({ length: 10 }, (_, i) => i + 8);
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 interface Appointment {
   id: string;
