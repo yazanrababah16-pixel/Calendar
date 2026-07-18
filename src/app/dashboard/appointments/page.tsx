@@ -8,7 +8,7 @@ import { BookingModal } from "@/components/calendar/booking-modal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Clock, User, Stethoscope } from "lucide-react";
+import { Plus, Clock, User, Stethoscope, AlertCircle } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   SCHEDULED: "Scheduled",
@@ -35,7 +35,7 @@ export default function AppointmentsPage() {
 
   const isPatient = role === "PATIENT";
   const filters = isPatient ? { patientId: session?.user?.id } : undefined;
-  const { data: appointments, isLoading } = useQuery(appointmentsQuery(filters));
+  const { data: appointments, isLoading, isError, error } = useQuery(appointmentsQuery(filters));
 
   const upcoming = appointments?.filter(
     (a) => !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(a.status),
@@ -65,6 +65,18 @@ export default function AppointmentsPage() {
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12">
+            <AlertCircle className="size-12 text-destructive" />
+            <p className="text-sm font-medium text-destructive">Failed to load appointments</p>
+            <p className="text-xs text-muted-foreground">
+              {error instanceof Error
+                ? error.message
+                : "An unexpected error occurred. Please try refreshing the page."}
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <>
           {upcoming && upcoming.length > 0 && (
