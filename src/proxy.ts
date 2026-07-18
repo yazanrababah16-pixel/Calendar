@@ -8,7 +8,7 @@ const roleRoutes: Record<string, Role[]> = {
   "/dashboard/admin": ["ADMIN"],
   "/dashboard/appointments": ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   "/dashboard/patients": ["ADMIN", "PROVIDER", "RECEPTIONIST"],
-  "/dashboard/providers": ["ADMIN"],
+  "/dashboard/providers": ["ADMIN", "RECEPTIONIST", "PROVIDER"],
   "/dashboard/schedule": ["ADMIN", "PROVIDER"],
   "/dashboard/settings": ["ADMIN", "PROVIDER", "RECEPTIONIST"],
   "/dashboard": ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],

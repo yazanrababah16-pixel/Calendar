@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { providersQuery } from "@/lib/queries/providers";
+import { canManageProviders } from "@/lib/role-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,8 +13,11 @@ import { AddProviderDialog } from "@/components/providers/add-provider-dialog";
 import { Stethoscope, Mail, Phone, CheckCircle, XCircle, Plus } from "lucide-react";
 
 export default function ProvidersPage() {
+  const { data: session } = useSession();
+  const role = session?.user?.role as "ADMIN" | "PROVIDER" | "RECEPTIONIST" | "PATIENT" | undefined;
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: providers, isLoading } = useQuery(providersQuery({ isActive: true }));
+  const canAdd = role ? canManageProviders(role) : false;
 
   if (isLoading) {
     return (
@@ -34,10 +39,12 @@ export default function ProvidersPage() {
           <h1 className="text-2xl font-semibold">Providers</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage healthcare providers</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-1 size-4" />
-          Add Provider
-        </Button>
+        {canAdd && (
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-1 size-4" />
+            Add Provider
+          </Button>
+        )}
       </div>
 
       {!providers || providers.length === 0 ? (

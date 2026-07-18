@@ -33,7 +33,7 @@ export function canManagePatients(role: Role): boolean {
 }
 
 export function canManageProviders(role: Role): boolean {
-  return role === "ADMIN";
+  return role === "ADMIN" || role === "RECEPTIONIST";
 }
 
 export function canAccessRoute(

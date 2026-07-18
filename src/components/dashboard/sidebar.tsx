@@ -43,7 +43,7 @@ const navItems: NavItem[] = [
     labelKey: "nav.providers",
     href: "/dashboard/providers",
     icon: Stethoscope,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "RECEPTIONIST", "PROVIDER"],
   },
   {
     labelKey: "nav.settings",
