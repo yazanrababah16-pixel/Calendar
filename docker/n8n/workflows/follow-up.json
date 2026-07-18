@@ -1,0 +1,48 @@
+{
+  "name": "Follow-up Survey",
+  "nodes": [
+    {
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "path": "follow-up",
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-1",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "parameters": {
+        "resume": "until",
+        "dateTime": "={{ Date.parse($json.endTime) + 86400000 }}"
+      }
+    },
+    {
+      "id": "noop-1",
+      "name": "Notify",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [750, 300],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Wait", "type": "main", "index": 0 }]]
+    },
+    "Wait": {
+      "main": [[{ "node": "Notify", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "timezone": "America/New_York"
+  },
+  "tags": [],
+  "active": false
+}

@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://calendar:calendar@postgres:5432/calendar?schema=public"
+      DIRECT_DATABASE_URL: "postgresql://calendar:calendar@postgres:5432/calendar?schema=public"
+      N8N_WEBHOOK_BASE_URL: "http://n8n:5678"
+      N8N_WEBHOOK_SECRET: "${N8N_WEBHOOK_SECRET:-local-dev-secret}"
+      AUTH_SECRET: "${AUTH_SECRET:-local-dev-auth-secret}"
+      NEXTAUTH_URL: "http://localhost:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - calendar-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: calendar
+      POSTGRES_PASSWORD: calendar
+      POSTGRES_DB: calendar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calendar -d calendar"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - calendar-network
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:1.90.2
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: "localhost"
+      N8N_PORT: 5678
+      N8N_PROTOCOL: "http"
+      WEBHOOK_URL: "http://localhost:5678"
+      N8N_SECURE_COOKIE: "false"
+      N8N_USER_MANAGEMENT_DISABLED: "true"
+      N8N_METRICS: "false"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - calendar-network
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  n8n-data:
+
+networks:
+  calendar-network:
+    driver: bridge

@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  PROVIDER
+  RECEPTIONIST
+  PATIENT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum WorkflowEventStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(PATIENT)
+  image       String?
+  passwordHash String?
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+
+  patient   Patient?
+  provider  Provider?
+
+  @@map("users")
+}
+
+model Patient {
+  id          String   @id @default(uuid())
+  dateOfBirth DateTime? @db.Timestamptz()
+  phone       String?
+  notes       String?
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+
+  @@map("patients")
+}
+
+model Provider {
+  id          String   @id @default(uuid())
+  specialty   String?
+  phone       String?
+  bio         String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+
+  userId      String        @unique
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+  availabilities Availability[]
+
+  @@map("providers")
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  title       String?
+  notes       String?
+  status      AppointmentStatus @default(SCHEDULED)
+  startTime   DateTime          @db.Timestamptz()
+  endTime     DateTime          @db.Timestamptz()
+  createdAt   DateTime          @default(now()) @db.Timestamptz()
+  updatedAt   DateTime          @updatedAt @db.Timestamptz()
+
+  patientId String  @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  providerId String  @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  workflowEvents WorkflowEvent[]
+
+  @@index([patientId])
+  @@index([providerId])
+  @@index([startTime, endTime])
+  @@index([status])
+  @@map("appointments")
+}
+
+model Availability {
+  id        String   @id @default(uuid())
+  dayOfWeek Int      // 0=Sunday, 1=Monday, etc.
+  startTime String   // "09:00"
+  endTime   String   // "17:00"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+
+  providerId String @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, dayOfWeek])
+  @@index([providerId])
+  @@map("availabilities")
+}
+
+model WorkflowEvent {
+  id              String              @id @default(uuid())
+  workflowType    String              // "appointment_reminder", "follow_up", "onboarding"
+  status          WorkflowEventStatus @default(PENDING)
+  payload         Json?
+  result          Json?
+  idempotencyKey  String              @unique
+  lastError       String?
+  createdAt       DateTime            @default(now()) @db.Timestamptz()
+  updatedAt       DateTime            @updatedAt @db.Timestamptz()
+
+  appointmentId   String? @map("appointment_id")
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([workflowType])
+  @@index([appointmentId])
+  @@map("workflow_events")
+}

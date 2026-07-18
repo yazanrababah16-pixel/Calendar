@@ -1,0 +1,74 @@
+{
+  "name": "Appointment Reminder",
+  "nodes": [
+    {
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {
+        "path": "appointment-reminder",
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-1",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "parameters": {
+        "resume": "until",
+        "dateTime": "={{ Date.parse($json.startTime) - 86400000 }}"
+      }
+    },
+    {
+      "id": "callback-1",
+      "name": "Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://app:3000/api/webhooks/n8n",
+        "authentication": "none",
+        "contentType": "json",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "workflowType", "value": "={{ $json.workflowType }}" },
+            { "name": "appointmentId", "value": "={{ $json.appointmentId }}" },
+            { "name": "idempotencyKey", "value": "={{ $json.idempotencyKey }}" },
+            { "name": "status", "value": "DELIVERED" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "noop-1",
+      "name": "Notification",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [750, 500],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Wait", "type": "main", "index": 0 }]]
+    },
+    "Wait": {
+      "main": [
+        [{ "node": "Notification", "type": "main", "index": 0 }],
+        [{ "node": "Callback", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/New_York"
+  },
+  "tags": [],
+  "active": false
+}
