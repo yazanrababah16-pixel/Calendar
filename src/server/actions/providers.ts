@@ -41,9 +41,27 @@ export async function createProvider(
 
   const { name, email, password, specialty, phone, bio } = parsed.data;
 
-  const existing = await db.user.findUnique({ where: { email } });
-  if (existing) {
-    return { success: false, error: "A user with this email already exists" };
+  const existingUser = await db.user.findUnique({ where: { email } });
+  if (existingUser) {
+    const existingProvider = await db.provider.findUnique({ where: { userId: existingUser.id } });
+    if (existingProvider) {
+      return { success: false, error: "This user is already a provider" };
+    }
+    await db.provider.create({
+      data: {
+        userId: existingUser.id,
+        specialty: specialty || null,
+        phone: phone || null,
+        bio: bio || null,
+      },
+    });
+    if (existingUser.role !== "PROVIDER") {
+      await db.user.update({
+        where: { id: existingUser.id },
+        data: { role: "PROVIDER" },
+      });
+    }
+    return { success: true, id: existingUser.id };
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
