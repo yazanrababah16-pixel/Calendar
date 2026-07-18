@@ -16,7 +16,7 @@ function ToasterViewport() {
 
   return (
     <Toast.Toast.Viewport className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
-      {toasts.map((t: Toast.Toast.Toast<ToastData>) => (
+      {toasts.map((t) => (
         <Toast.Toast.Root
           key={t.id}
           toast={t}
