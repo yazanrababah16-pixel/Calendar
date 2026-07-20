@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface Appointment {
   id: string;
   title: string | null;
+  color: string | null;
   status: string;
   startTime: string;
   patient: { user: { name: string } };
@@ -102,8 +103,9 @@ export function MonthView({
                     <span
                       className={cn(
                         "size-1.5 rounded-full shrink-0",
-                        statusDot[apt.status] ?? "bg-gray-400",
+                        apt.color ?? statusDot[apt.status] ?? "bg-gray-400",
                       )}
+                      style={apt.color ? { backgroundColor: apt.color } : undefined}
                     />
                     <span className="truncate">
                       {format(new Date(apt.startTime), "h:mm")} {apt.patient.user.name}

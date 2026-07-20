@@ -8,6 +8,7 @@ import { MonthView } from "./month-view";
 interface Appointment {
   id: string;
   title: string | null;
+  color: string | null;
   status: string;
   startTime: string;
   endTime: string;

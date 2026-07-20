@@ -52,6 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const data: Record<string, unknown> = {};
   if (parsed.data.title !== undefined) data.title = parsed.data.title;
   if (parsed.data.notes !== undefined) data.notes = parsed.data.notes;
+  if (parsed.data.color !== undefined) data.color = parsed.data.color;
   if (parsed.data.status !== undefined) data.status = parsed.data.status;
   if (parsed.data.startTime !== undefined) data.startTime = new Date(parsed.data.startTime);
   if (parsed.data.endTime !== undefined) data.endTime = new Date(parsed.data.endTime);

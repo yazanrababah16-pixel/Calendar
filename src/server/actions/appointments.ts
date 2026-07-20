@@ -23,6 +23,7 @@ export async function bookAppointment(
     endTime: formData.get("endTime"),
     title: formData.get("title") || undefined,
     notes: formData.get("notes") || undefined,
+    color: formData.get("color") || undefined,
   });
 
   if (!parsed.success) {
@@ -30,7 +31,7 @@ export async function bookAppointment(
     return { success: false, error: issue?.message ?? "Invalid input" };
   }
 
-  const { providerId, patientId, startTime, endTime, title, notes } = parsed.data;
+  const { providerId, patientId, startTime, endTime, title, notes, color } = parsed.data;
   const start = new Date(startTime);
   const end = new Date(endTime);
 
@@ -58,6 +59,7 @@ export async function bookAppointment(
       endTime: end,
       title: title ?? null,
       notes: notes ?? null,
+      color: color ?? undefined,
     },
   });
 
@@ -127,6 +129,7 @@ export async function updateAppointment(
     endTime: formData.get("endTime"),
     title: formData.get("title") || undefined,
     notes: formData.get("notes") || undefined,
+    color: formData.get("color") || undefined,
   });
 
   if (!parsed.success) {
@@ -134,7 +137,7 @@ export async function updateAppointment(
     return { success: false, error: issue?.message ?? "Invalid input" };
   }
 
-  const { providerId, patientId, startTime, endTime, title, notes } = parsed.data;
+  const { providerId, patientId, startTime, endTime, title, notes, color } = parsed.data;
   const start = new Date(startTime);
   const end = new Date(endTime);
 
@@ -164,6 +167,7 @@ export async function updateAppointment(
       endTime: end,
       title: title ?? null,
       notes: notes ?? null,
+      color: color ?? null,
     },
   });
 

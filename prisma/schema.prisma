@@ -84,6 +84,7 @@ model Appointment {
   id          String            @id @default(uuid())
   title       String?
   notes       String?
+  color       String?           @default("#3b82f6")
   status      AppointmentStatus @default(SCHEDULED)
   startTime   DateTime          @db.Timestamptz()
   endTime     DateTime          @db.Timestamptz()

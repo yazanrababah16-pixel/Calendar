@@ -9,6 +9,8 @@ export const appointmentStatuses = [
   "NO_SHOW",
 ] as const;
 
+const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 export const createAppointmentSchema = z.object({
   providerId: z.string().uuid(),
   patientId: z.string().uuid(),
@@ -16,6 +18,7 @@ export const createAppointmentSchema = z.object({
   endTime: z.string().datetime({ offset: true }),
   title: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
+  color: z.string().regex(hexColorRegex, "Invalid hex color").optional(),
 });
 
 export const updateAppointmentSchema = z.object({
@@ -24,6 +27,7 @@ export const updateAppointmentSchema = z.object({
   status: z.enum(appointmentStatuses).optional(),
   startTime: z.string().datetime({ offset: true }).optional(),
   endTime: z.string().datetime({ offset: true }).optional(),
+  color: z.string().regex(hexColorRegex, "Invalid hex color").optional(),
 });
 
 export const queryAppointmentsSchema = z.object({

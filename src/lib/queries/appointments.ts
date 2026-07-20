@@ -19,6 +19,7 @@ export type AppointmentListItem = {
   id: string;
   title: string | null;
   notes: string | null;
+  color: string | null;
   status: string;
   startTime: string;
   endTime: string;

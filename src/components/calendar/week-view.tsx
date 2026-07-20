@@ -16,6 +16,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 interface Appointment {
   id: string;
   title: string | null;
+  color: string | null;
   status: string;
   startTime: string;
   endTime: string;
@@ -56,6 +57,14 @@ export function WeekView({
     CANCELLED: "border-l-red-500 bg-red-50 dark:bg-red-950/30 opacity-60",
     NO_SHOW: "border-l-red-500 bg-red-50 dark:bg-red-950/30 opacity-60",
   };
+
+  function hexToRgba(hex: string, alpha: number) {
+    const clean = hex.replace("#", "");
+    const r = Number.parseInt(clean.substring(0, 2), 16);
+    const g = Number.parseInt(clean.substring(2, 4), 16);
+    const b = Number.parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   return (
     <div className="overflow-auto rounded-lg border">
@@ -104,24 +113,37 @@ export function WeekView({
                     onSlotClick?.(slotStart);
                   }}
                 >
-                  {dayAppointments.map((apt) => (
-                    <div
-                      key={apt.id}
-                      className={cn(
-                        "mb-1 cursor-pointer rounded border-l-2 px-2 py-1 text-xs shadow-xs transition-colors hover:opacity-80",
-                        statusColors[apt.status] ?? "border-l-gray-300",
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAppointmentClick?.(apt.id);
-                      }}
-                    >
-                      <div className="font-medium truncate">{apt.title || "Appointment"}</div>
-                      <div className="truncate text-muted-foreground">
-                        {format(new Date(apt.startTime), "h:mm a")} &middot; {apt.patient.user.name}
+                  {dayAppointments.map((apt) => {
+                    const bgColor = apt.color ? hexToRgba(apt.color, 0.15) : undefined;
+                    const borderColor = apt.color ?? undefined;
+                    return (
+                      <div
+                        key={apt.id}
+                        className={cn(
+                          "mb-1 cursor-pointer rounded border-l-2 px-2 py-1 text-xs shadow-xs transition-colors hover:opacity-80",
+                          !apt.color && (statusColors[apt.status] ?? "border-l-gray-300"),
+                        )}
+                        style={
+                          apt.color
+                            ? {
+                                backgroundColor: bgColor,
+                                borderLeftColor: borderColor,
+                              }
+                            : undefined
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAppointmentClick?.(apt.id);
+                        }}
+                      >
+                        <div className="font-medium truncate">{apt.title || "Appointment"}</div>
+                        <div className="truncate text-muted-foreground">
+                          {format(new Date(apt.startTime), "h:mm a")} &middot;{" "}
+                          {apt.patient.user.name}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })}

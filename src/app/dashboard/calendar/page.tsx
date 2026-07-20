@@ -17,6 +17,7 @@ type AppointmentData = {
   endTime: string;
   title: string | null;
   notes: string | null;
+  color: string | null;
   status: string;
 };
 

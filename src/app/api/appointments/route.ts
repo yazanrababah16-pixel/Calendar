@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: issue?.message ?? "Invalid input" }, { status: 400 });
   }
 
-  const { providerId, patientId, startTime, endTime, title, notes } = parsed.data;
+  const { providerId, patientId, startTime, endTime, title, notes, color } = parsed.data;
   const start = new Date(startTime);
   const end = new Date(endTime);
 
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       endTime: end,
       title: title ?? null,
       notes: notes ?? null,
+      color: color ?? undefined,
     },
     include: {
       patient: { include: { user: { select: { name: true, email: true } } } },
