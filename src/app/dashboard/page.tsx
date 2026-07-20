@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  DollarSign,
+  Receipt,
 } from "lucide-react";
 import { LinkByUsername } from "@/components/patients/link-by-username";
 
@@ -42,7 +44,7 @@ async function PatientDashboard({ userId }: { userId: string }) {
     return <p className="text-sm text-muted-foreground">Patient profile not found.</p>;
   }
 
-  const [links, upcoming, past] = await Promise.all([
+  const [links, upcoming, past, invoices] = await Promise.all([
     db.patientProvider.findMany({
       where: { patientId: patient.id },
       include: {
@@ -82,9 +84,25 @@ async function PatientDashboard({ userId }: { userId: string }) {
       orderBy: { startTime: "desc" },
       take: 50,
     }),
+    db.invoice.findMany({
+      where: { patientId: patient.id },
+      include: {
+        payments: { orderBy: { paidAt: "desc" } },
+        appointment: {
+          include: {
+            provider: { include: { user: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { issuedAt: "desc" },
+    }),
   ]);
 
-  const doctors = links.map((l) => l.provider);
+  const invStatusBadge: Record<string, string> = {
+    PENDING: "bg-red-100 text-red-700",
+    PARTIAL: "bg-amber-100 text-amber-700",
+    PAID: "bg-green-100 text-green-700",
+  };
 
   return (
     <div className="space-y-8">
@@ -232,6 +250,190 @@ async function PatientDashboard({ userId }: { userId: string }) {
           </div>
         )}
       </section>
+
+      {/* My Bills / Invoices */}
+      <section>
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+          <Receipt className="size-5 text-primary" />
+          My Bills
+        </h2>
+        {invoices.length === 0 ? (
+          <Card>
+            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+              No invoices yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="rounded-lg border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium">Date</th>
+                    <th className="px-4 py-3 text-left font-medium">Doctor</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
+                    <th className="px-4 py-3 text-right font-medium">Balance Due</th>
+                    <th className="px-4 py-3 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => {
+                    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+                    const total = Number(inv.totalAmount);
+                    const balance = total - paid;
+                    return (
+                      <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {new Date(inv.issuedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          {inv.appointment?.provider.user.name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium">${total.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-medium">
+                          {balance > 0 ? (
+                            <span className="text-red-600">${balance.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-green-600">$0.00</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              invStatusBadge[inv.status] ?? "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+async function ProviderDashboard({ userId }: { userId: string }) {
+  const provider = await db.provider.findUnique({ where: { userId }, select: { id: true } });
+  if (!provider) {
+    return <p className="text-sm text-muted-foreground">Provider profile not found.</p>;
+  }
+
+  const invoices = await db.invoice.findMany({
+    where: { appointment: { providerId: provider.id } },
+    include: {
+      payments: true,
+      patient: { include: { user: { select: { name: true, email: true } } } },
+    },
+    orderBy: { issuedAt: "desc" },
+    take: 50,
+  });
+
+  const data = invoices.map((inv) => ({
+    ...inv,
+    totalAmount: Number(inv.totalAmount),
+    payments: inv.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+  }));
+
+  const totalInvoiced = data.reduce((sum, inv) => sum + inv.totalAmount, 0);
+  const totalCollected = data.reduce(
+    (sum, inv) => sum + inv.payments.reduce((ps, p) => ps + p.amount, 0),
+    0,
+  );
+  const totalOutstanding = totalInvoiced - totalCollected;
+
+  const invStatusStyles: Record<string, string> = {
+    PENDING: "bg-red-100 text-red-700",
+    PARTIAL: "bg-amber-100 text-amber-700",
+    PAID: "bg-green-100 text-green-700",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Revenue Summary */}
+      <section>
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+          <DollarSign className="size-5 text-primary" />
+          Revenue Summary
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Total Invoiced</p>
+              <p className="text-2xl font-bold">${totalInvoiced.toFixed(2)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Total Collected</p>
+              <p className="text-2xl font-bold text-green-600">${totalCollected.toFixed(2)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Outstanding</p>
+              <p className="text-2xl font-bold text-red-600">${totalOutstanding.toFixed(2)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Invoice List */}
+      {data.length > 0 && (
+        <section>
+          <h3 className="text-md font-semibold mb-2">Recent Invoices</h3>
+          <div className="rounded-lg border">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-3 text-left font-medium">Patient</th>
+                    <th className="px-4 py-3 text-left font-medium">Date</th>
+                    <th className="px-4 py-3 text-right font-medium">Amount</th>
+                    <th className="px-4 py-3 text-center font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((inv) => (
+                    <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-4 py-3 font-medium">{inv.patient.user.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {new Date(inv.issuedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        ${inv.totalAmount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            invStatusStyles[inv.status] ?? "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -250,6 +452,18 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">Welcome back, {session.user.name}.</p>
         </div>
         <PatientDashboard userId={session.user.id} />
+      </div>
+    );
+  }
+
+  if (role === "PROVIDER") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Welcome back, {session.user.name}.</p>
+        </div>
+        <ProviderDashboard userId={session.user.id} />
       </div>
     );
   }

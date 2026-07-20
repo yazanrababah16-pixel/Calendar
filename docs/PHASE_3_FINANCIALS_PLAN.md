@@ -95,22 +95,26 @@ erDiagram
 
 ## 4. Provider Financial Dashboard
 
-- [ ] Create `/dashboard/financials` page — revenue summary scoped to provider's appointments
-  - Total invoiced, total collected, total outstanding
-  - Invoice list with patient name, status, amount, date
-  - Date range filter
+- [x] Add Revenue Summary to PROVIDER dashboard (`src/app/dashboard/page.tsx`)
+  - Total invoiced, total collected, total outstanding summary cards
+  - Recent invoices table with patient name, amount, status
+  - Strictly locked to PROVIDER role via `ProviderDashboard` component
+- [x] Add My Bills section to PATIENT dashboard (`src/app/dashboard/page.tsx`)
+  - Invoice table with date, doctor name, total, balance due, status badge
+  - Read-only view (no payment actions for patients)
 
 ## 5. Implementation Order
 
-| Priority | Module                      | Depends On | Estimated Files               |
-| -------- | --------------------------- | ---------- | ----------------------------- |
-| P1       | 1. Database Schema          | —          | 1 (schema) + 1 migration      |
-| P1       | 2. Billing Server Actions   | 1          | 1 (action file)               |
-| P2       | 3.1 GenerateInvoiceDialog   | 2          | 1 (component)                 |
-| P2       | 3.2 PaymentModal            | 2          | 1 (component)                 |
-| P2       | 3.3 Billing Page (list)     | 3.1, 3.2   | 1 (page)                      |
-| P2       | 3.4 Invoice Detail Page     | 3.1, 3.2   | 1 (page)                      |
-| P2       | 3.5 Calendar Integration    | 3.1        | 1 (existing component update) |
-| P2       | 4.1 Provider Financial Page | 3.3, 3.4   | 1 (page)                      |
+| Priority | Module                       | Depends On | Estimated Files               |
+| -------- | ---------------------------- | ---------- | ----------------------------- |
+| P1       | 1. Database Schema           | —          | 1 (schema) + 1 migration      |
+| P1       | 2. Billing Server Actions    | 1          | 1 (action file)               |
+| P2       | 3.1 GenerateInvoiceDialog    | 2          | 1 (component)                 |
+| P2       | 3.2 PaymentModal             | 2          | 1 (component)                 |
+| P2       | 3.3 Billing Page (list)      | 3.1, 3.2   | 1 (page)                      |
+| P2       | 3.4 Invoice Detail Page      | 3.1, 3.2   | 1 (page)                      |
+| P2       | 3.5 Calendar Integration     | 3.1        | 1 (existing component update) |
+| P2       | 4.1 Provider Financial Cards | 3.3        | 1 (dashboard component)       |
+| P2       | 4.2 Patient Invoice History  | 3.3        | 1 (dashboard component)       |
 
 > **Next**: Schema expansion and core server actions first. Then receptionist billing UI. Provider financial dashboard last.
