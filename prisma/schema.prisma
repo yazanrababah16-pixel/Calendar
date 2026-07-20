@@ -51,7 +51,7 @@ model User {
   image        String?
   passwordHash String?
   createdAt    DateTime @default(now()) @db.Timestamptz()
-  updatedAt    DateTime @updatedAt @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   patient   Patient?
   provider  Provider?
@@ -70,7 +70,7 @@ model Patient {
   phone       String?
   notes       String?
   createdAt   DateTime @default(now()) @db.Timestamptz()
-  updatedAt   DateTime @updatedAt @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -88,7 +88,7 @@ model Provider {
   bio       String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -141,7 +141,7 @@ model WorkingHours {
   endTime   String   // "17:00"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   providerId String @map("provider_id")
   provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
@@ -157,7 +157,7 @@ model LeaveRequest {
   status     LeaveRequestStatus @default(PENDING)
   reason     String?
   createdAt  DateTime           @default(now()) @db.Timestamptz()
-  updatedAt  DateTime           @updatedAt @db.Timestamptz()
+  updatedAt  DateTime           @default(now()) @updatedAt @db.Timestamptz()
 
   providerId String @map("provider_id")
   provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
@@ -175,7 +175,7 @@ model Notification {
   relatedEntityId   String?
   relatedEntityType String?            // "appointment", "leave_request", etc.
   createdAt         DateTime           @default(now()) @db.Timestamptz()
-  updatedAt         DateTime           @updatedAt @db.Timestamptz()
+  updatedAt         DateTime           @default(now()) @updatedAt @db.Timestamptz()
 
   senderId   String @map("sender_id")
   sender     User   @relation("SentNotifications", fields: [senderId], references: [id], onDelete: Cascade)
@@ -198,7 +198,7 @@ model Appointment {
   startTime   DateTime          @db.Timestamptz()
   endTime     DateTime          @db.Timestamptz()
   createdAt   DateTime          @default(now()) @db.Timestamptz()
-  updatedAt   DateTime          @updatedAt @db.Timestamptz()
+  updatedAt   DateTime          @default(now()) @updatedAt @db.Timestamptz()
 
   patientId String  @map("patient_id")
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -222,7 +222,7 @@ model Availability {
   endTime   String   // "17:00"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   providerId String @map("provider_id")
   provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
@@ -241,7 +241,7 @@ model WorkflowEvent {
   idempotencyKey  String              @unique
   lastError       String?
   createdAt       DateTime            @default(now()) @db.Timestamptz()
-  updatedAt       DateTime            @updatedAt @db.Timestamptz()
+  updatedAt       DateTime            @default(now()) @updatedAt @db.Timestamptz()
 
   appointmentId   String? @map("appointment_id")
   appointment     Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
