@@ -148,10 +148,11 @@
 
 ### 4.1 Patient Dashboard
 
-- [ ] Create `PatientDashboard` component (`/dashboard` or `/dashboard/patient`)
+- [x] Create `PatientDashboard` component (built into `/dashboard` for PATIENT role)
   - Upcoming appointments list with status, provider name, date/time
   - Show "Reschedule Reason" if present in notes (parsed from `notes` field after `Rescheduled:` marker)
   - Quick action: "Book Appointment" (opens BookingModal scoped to their linked providers)
+- [x] "My Doctors" section showing linked providers
 
 ### 4.2 Provider Linking via Username
 
@@ -164,8 +165,8 @@
 
 ### 4.3 Appointment History
 
-- [ ] Show past appointments with status, notes, and color indicator
-- [ ] Allow patients to view but not edit past appointment details
+- [x] Show past appointments with status, notes, and color indicator
+- [x] Allow patients to view but not edit past appointment details
 
 ---
 
