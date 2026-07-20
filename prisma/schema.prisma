@@ -42,6 +42,18 @@ enum NotificationStatus {
   ACTIONED
 }
 
+enum InvoiceStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  INSURANCE
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -76,6 +88,7 @@ model Patient {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   appointments    Appointment[]
+  invoices        Invoice[]
   patientProviders PatientProvider[]
 
   @@map("patients")
@@ -206,6 +219,7 @@ model Appointment {
   providerId String  @map("provider_id")
   provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
+  invoice       Invoice?
   workflowEvents WorkflowEvent[]
 
   @@index([patientId])
@@ -213,6 +227,43 @@ model Appointment {
   @@index([startTime, endTime])
   @@index([status])
   @@map("appointments")
+}
+
+model Invoice {
+  id           String        @id @default(uuid())
+  totalAmount  Decimal       @db.Decimal(10, 2)
+  status       InvoiceStatus @default(PENDING)
+  issuedAt     DateTime      @default(now()) @db.Timestamptz()
+  dueDate      DateTime?     @db.Timestamptz()
+  createdAt    DateTime      @default(now()) @db.Timestamptz()
+  updatedAt    DateTime      @default(now()) @updatedAt @db.Timestamptz()
+
+  patientId String @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  appointmentId String @unique @map("appointment_id")
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  payments Payment[]
+
+  @@index([patientId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  paidAt        DateTime      @default(now()) @db.Timestamptz()
+  createdAt     DateTime      @default(now()) @db.Timestamptz()
+  updatedAt     DateTime      @default(now()) @updatedAt @db.Timestamptz()
+
+  invoiceId String @map("invoice_id")
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("payments")
 }
 
 model Availability {

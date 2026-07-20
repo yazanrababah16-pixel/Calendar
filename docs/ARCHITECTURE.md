@@ -205,6 +205,28 @@ erDiagram
         string receiverId FK
     }
 
+    Invoice {
+        string id PK
+        decimal totalAmount
+        enum status "PENDING | PARTIAL | PAID"
+        datetime issuedAt
+        datetime dueDate "nullable"
+        datetime createdAt
+        datetime updatedAt
+        string patientId FK
+        string appointmentId FK, UK
+    }
+
+    Payment {
+        string id PK
+        decimal amount
+        enum paymentMethod "CASH | CARD | INSURANCE"
+        datetime paidAt
+        datetime createdAt
+        datetime updatedAt
+        string invoiceId FK
+    }
+
     User ||--o| Patient : "has one"
     User ||--o| Provider : "has one"
     User ||--o{ ProviderAssignment : "assigned to"
@@ -213,6 +235,7 @@ erDiagram
 
     Patient ||--o{ Appointment : "has"
     Patient ||--o{ PatientProvider : "linked to"
+    Patient ||--o{ Invoice : "has"
 
     Provider ||--o{ Appointment : "has"
     Provider ||--o{ PatientProvider : "linked to"
@@ -221,7 +244,9 @@ erDiagram
     Provider ||--o{ Availability : "has"
     Provider ||--o{ ProviderAssignment : "assignment"
 
+    Appointment ||--o| Invoice : "billed as"
     Appointment ||--o{ WorkflowEvent : "triggers"
+    Invoice ||--o{ Payment : "has"
 ```
 
 ## Calendar RBAC — Detailed Flow
@@ -302,6 +327,9 @@ sequenceDiagram
 - **Provider → LeaveRequest**: 1:N
 - **Appointment → WorkflowEvent**: 1:N
 - **User → Notification**: 1:N (as sender), 1:N (as receiver)
+- **Appointment → Invoice**: 1:1 (optional)
+- **Patient → Invoice**: 1:N
+- **Invoice → Payment**: 1:N
 
 ## RBAC Matrix
 
@@ -317,3 +345,4 @@ sequenceDiagram
 | Leave Requests    | ✗     | ✗               | ✓ own          | ✗       |
 | Settings          | ✓     | ✓               | ✓              | ✓       |
 | Notifications     | ✗     | ✓ receive       | ✓ send/receive | ✗       |
+| Billing           | ✓     | ✓               | ✓ own          | ✓ read  |

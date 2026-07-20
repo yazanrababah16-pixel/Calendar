@@ -1,0 +1,75 @@
+{
+  "version": "7.8",
+  "steps": [
+    {
+      "tag": "CreateEnum",
+      "enum": "InvoiceStatus",
+      "values": ["PENDING", "PARTIAL", "PAID"]
+    },
+    {
+      "tag": "CreateEnum",
+      "enum": "PaymentMethod",
+      "values": ["CASH", "CARD", "INSURANCE"]
+    },
+    {
+      "tag": "CreateTable",
+      "table": "invoices",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "uuid" }, "autoincrement": false },
+        { "name": "totalAmount", "type": "DECIMAL(10,2)" },
+        { "name": "status", "type": "InvoiceStatus", "default": "PENDING" },
+        { "name": "issuedAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "dueDate", "type": "TIMESTAMPTZ", "default": null },
+        { "name": "createdAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "updatedAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "patient_id", "type": "TEXT" },
+        { "name": "appointment_id", "type": "TEXT" }
+      ],
+      "primaryKey": { "columns": ["id"] },
+      "uniqueConstraints": [
+        { "name": "invoices_appointment_id_key", "columns": ["appointment_id"] }
+      ],
+      "indexes": [
+        { "name": "invoices_patient_id_idx", "columns": ["patient_id"] },
+        { "name": "invoices_status_idx", "columns": ["status"] }
+      ],
+      "foreignKeys": [
+        {
+          "columns": ["patient_id"],
+          "referencedTable": "patients",
+          "referencedColumns": ["id"],
+          "onDelete": "CASCADE"
+        },
+        {
+          "columns": ["appointment_id"],
+          "referencedTable": "appointments",
+          "referencedColumns": ["id"],
+          "onDelete": "CASCADE"
+        }
+      ]
+    },
+    {
+      "tag": "CreateTable",
+      "table": "payments",
+      "columns": [
+        { "name": "id", "type": "TEXT", "default": { "name": "uuid" }, "autoincrement": false },
+        { "name": "amount", "type": "DECIMAL(10,2)" },
+        { "name": "paymentMethod", "type": "PaymentMethod" },
+        { "name": "paidAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "createdAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "updatedAt", "type": "TIMESTAMPTZ", "default": { "name": "now" } },
+        { "name": "invoice_id", "type": "TEXT" }
+      ],
+      "primaryKey": { "columns": ["id"] },
+      "indexes": [{ "name": "payments_invoice_id_idx", "columns": ["invoice_id"] }],
+      "foreignKeys": [
+        {
+          "columns": ["invoice_id"],
+          "referencedTable": "invoices",
+          "referencedColumns": ["id"],
+          "onDelete": "CASCADE"
+        }
+      ]
+    }
+  ]
+}
