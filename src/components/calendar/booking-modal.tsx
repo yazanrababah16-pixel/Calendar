@@ -32,6 +32,16 @@ import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
 import { Bell, CheckCircle2, Clock, XCircle, Plus, Pencil, Calendar } from "lucide-react";
 import type { WorkflowEventInfo } from "@/lib/queries/appointments";
 
+function toLocalDatetimeString(utcIso: string): string {
+  const d = new Date(utcIso);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 const PRESET_COLORS = [
   { label: "Blue", value: "#3b82f6" },
   { label: "Green", value: "#22c55e" },
@@ -114,15 +124,23 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const canEdit = !isEdit || role === "ADMIN" || role === "RECEPTIONIST";
 
   const defaultEnd = defaultStart
-    ? new Date(new Date(defaultStart).getTime() + 60 * 60 * 1000).toISOString().slice(0, 16)
+    ? toLocalDatetimeString(
+        new Date(new Date(defaultStart).getTime() + 60 * 60 * 1000).toISOString(),
+      )
     : undefined;
 
   const buildFormDefaults = useCallback(
     (): BookingFormData => ({
       patientId: appointment?.patientId ?? "",
       providerId: appointment?.providerId ?? "",
-      startTime: appointment?.startTime.slice(0, 16) ?? defaultStart?.slice(0, 16) ?? "",
-      endTime: appointment?.endTime.slice(0, 16) ?? defaultEnd ?? "",
+      startTime: appointment?.startTime
+        ? toLocalDatetimeString(appointment.startTime)
+        : defaultStart
+          ? toLocalDatetimeString(defaultStart)
+          : "",
+      endTime: appointment?.endTime
+        ? toLocalDatetimeString(appointment.endTime)
+        : (defaultEnd ?? ""),
       title: appointment?.title ?? "",
       notes: appointment?.notes ?? "",
       color: appointment?.color ?? "#3b82f6",
