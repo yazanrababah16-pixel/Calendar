@@ -13,6 +13,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { LinkByUsername } from "@/components/patients/link-by-username";
+import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 
 const statusBadge: Record<string, string> = {
   SCHEDULED: "bg-blue-100 text-blue-700 border-blue-200",
@@ -464,6 +465,18 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">Welcome back, {session.user.name}.</p>
         </div>
         <ProviderDashboard userId={session.user.id} />
+      </div>
+    );
+  }
+
+  if (role === "ADMIN") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Overview and analytics</p>
+        </div>
+        <AdminDashboard />
       </div>
     );
   }
