@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/locale-context";
 import { LogOut } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 export function Header() {
   const { data: session } = useSession();
@@ -15,6 +16,7 @@ export function Header() {
   return (
     <header className="flex h-14 items-center justify-end gap-4 border-b bg-background px-6">
       <div className="flex items-center gap-3">
+        <NotificationBell />
         <Button
           variant="ghost"
           size="icon"

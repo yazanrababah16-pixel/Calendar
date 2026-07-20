@@ -120,9 +120,43 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
     return { success: false, error: "A leave request already exists for this date" };
   }
 
-  await db.leaveRequest.create({
+  const leave = await db.leaveRequest.create({
     data: { providerId, date: leaveDate, reason: reason || null, status: "PENDING" },
   });
+
+  const provider = await db.provider.findUnique({
+    where: { id: providerId },
+    include: { user: { select: { id: true, name: true } } },
+  });
+
+  if (provider) {
+    const assignments = await db.providerAssignment.findMany({
+      where: { providerId },
+      include: { user: { select: { id: true } } },
+    });
+
+    const receptionistIds = assignments.map((a) => a.user.id);
+
+    if (receptionistIds.length > 0) {
+      const dateStr = leaveDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      await db.notification.createMany({
+        data: receptionistIds.map((receiverId) => ({
+          type: "leave_notification",
+          message: `Dr. ${provider.user.name} requested a leave on ${dateStr}. Please reschedule their appointments.`,
+          relatedEntityId: leave.id,
+          relatedEntityType: "leave_request",
+          senderId: session.user.id,
+          receiverId,
+        })),
+      });
+    }
+  }
 
   return { success: true };
 }
