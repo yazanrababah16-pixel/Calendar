@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -53,6 +53,7 @@ const bookingFormSchema = z.object({
   title: z.string().max(200).optional().or(z.literal("")),
   notes: z.string().max(2000).optional().or(z.literal("")),
   color: z.string().optional().or(z.literal("")),
+  rescheduleReason: z.string().max(2000).optional().or(z.literal("")),
 });
 
 type BookingFormData = z.infer<typeof bookingFormSchema>;
@@ -101,8 +102,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
-  const [editMode, setEditMode] = useState<"none" | "details" | "reschedule">("none");
-  const [selectedColor, setSelectedColor] = useState(appointment?.color ?? "#3b82f6");
+  const [editMode, setEditMode] = useState<"none" | "reschedule" | "full">("none");
   const { toast } = useToast();
 
   const { data: providers } = useQuery(providersQuery({ isActive: true }));
@@ -111,10 +111,25 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const isEdit = !!appointment;
   const canCancel =
     appointment && !["CANCELLED", "COMPLETED", "NO_SHOW"].includes(appointment.status);
+  const canEdit = !isEdit || role === "ADMIN" || role === "RECEPTIONIST";
 
   const defaultEnd = defaultStart
     ? new Date(new Date(defaultStart).getTime() + 60 * 60 * 1000).toISOString().slice(0, 16)
     : undefined;
+
+  const buildFormDefaults = useCallback(
+    (): BookingFormData => ({
+      patientId: appointment?.patientId ?? "",
+      providerId: appointment?.providerId ?? "",
+      startTime: appointment?.startTime.slice(0, 16) ?? defaultStart?.slice(0, 16) ?? "",
+      endTime: appointment?.endTime.slice(0, 16) ?? defaultEnd ?? "",
+      title: appointment?.title ?? "",
+      notes: appointment?.notes ?? "",
+      color: appointment?.color ?? "#3b82f6",
+      rescheduleReason: "",
+    }),
+    [appointment, defaultStart, defaultEnd],
+  );
 
   const {
     register,
@@ -125,18 +140,25 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     formState: { errors, isSubmitting },
   } = useForm<BookingFormData>({
     resolver: zodResolver(bookingFormSchema),
-    defaultValues: {
-      patientId: appointment?.patientId ?? "",
-      providerId: appointment?.providerId ?? session?.user?.id ?? "",
-      startTime: appointment?.startTime.slice(0, 16) ?? defaultStart?.slice(0, 16) ?? "",
-      endTime: appointment?.endTime.slice(0, 16) ?? defaultEnd ?? "",
-      title: appointment?.title ?? "",
-      notes: appointment?.notes ?? "",
-      color: appointment?.color ?? "#3b82f6",
-    },
+    defaultValues: buildFormDefaults(),
   });
 
-  const watchedColor = watch("color") || selectedColor;
+  useEffect(() => {
+    if (open) {
+      setEditMode("none");
+      setError(null);
+      setCancelling(false);
+      setDeleting(false);
+      reset(buildFormDefaults());
+    }
+  }, [open, reset, buildFormDefaults]);
+
+  const watchedColor = watch("color") || "#3b82f6";
+
+  const patientName =
+    appointment && patients?.find((p) => p.id === appointment.patientId)?.user?.name;
+  const providerName =
+    appointment && providers?.find((p) => p.id === appointment.providerId)?.user?.name;
 
   const onSubmit = useCallback(
     async (data: BookingFormData) => {
@@ -148,8 +170,15 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
       formData.set("startTime", new Date(data.startTime).toISOString());
       formData.set("endTime", new Date(data.endTime).toISOString());
       if (data.title) formData.set("title", data.title);
-      if (data.notes) formData.set("notes", data.notes);
-      formData.set("color", selectedColor);
+
+      let notes = data.notes ?? "";
+      if (data.rescheduleReason) {
+        const prefix = notes ? `${notes}\n---\n` : "";
+        notes = `${prefix}Rescheduled: ${data.rescheduleReason}`;
+      }
+      if (notes) formData.set("notes", notes);
+
+      formData.set("color", data.color || "#3b82f6");
 
       const result = appointment
         ? await updateAppointment(null, formData)
@@ -157,7 +186,6 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
 
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["appointments"] });
-        reset();
         setError(null);
         setEditMode("none");
         onOpenChange(false);
@@ -174,7 +202,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
         });
       }
     },
-    [appointment, queryClient, reset, onOpenChange, toast, selectedColor],
+    [appointment, queryClient, onOpenChange, toast],
   );
 
   const handleCancel = useCallback(async () => {
@@ -228,31 +256,26 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
     [queryClient, setValue, toast],
   );
 
-  const handleColorSelect = useCallback(
-    (color: string) => {
-      setSelectedColor(color);
-      setValue("color", color);
-    },
-    [setValue],
-  );
-
   const handleClose = useCallback(() => {
-    reset();
     setError(null);
     setEditMode("none");
     onOpenChange(false);
-  }, [reset, onOpenChange]);
+  }, [onOpenChange]);
 
-  const showProviderSelect =
-    role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit;
-  const canEdit = !isEdit || role === "ADMIN" || role === "RECEPTIONIST";
-  const patientName =
-    appointment && patients?.find((p) => p.id === appointment.patientId)?.user?.name;
-  const providerName =
-    appointment && providers?.find((p) => p.id === appointment.providerId)?.user?.name;
+  const handleRescheduleClick = useCallback(() => {
+    setEditMode("reschedule");
+  }, []);
+
+  const handleFullEditClick = useCallback(() => {
+    setEditMode("full");
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setEditMode("none");
+  }, []);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
@@ -280,6 +303,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
           </div>
         )}
 
+        {/* ─── View Mode: Read-only details ─── */}
         {isEdit && editMode === "none" && appointment && (
           <div className="space-y-3 rounded-lg border p-4">
             <h3 className="text-sm font-semibold">Appointment Details</h3>
@@ -363,59 +387,84 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
             </div>
           )}
 
-        {/* Color Selection - shown in all edit modes */}
-        {isEdit && canEdit && (
-          <div className="space-y-2">
-            <Label>Appointment Color</Label>
-            <div className="flex flex-wrap gap-2">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  title={c.label}
-                  onClick={() => handleColorSelect(c.value)}
-                  className={`size-7 rounded-full border-2 transition-all hover:scale-110 ${
-                    watchedColor === c.value ? "border-foreground scale-110" : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: c.value }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* ─── View Mode Action Buttons ─── */}
         {isEdit && canEdit && editMode === "none" && (
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setValue("startTime", appointment.startTime.slice(0, 16));
-                setValue("endTime", appointment.endTime.slice(0, 16));
-                setEditMode("reschedule");
-              }}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={handleRescheduleClick}>
               <Calendar className="mr-1 size-4" />
               Reschedule
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setValue("notes", appointment.notes ?? "");
-                setEditMode("details");
-              }}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={handleFullEditClick}>
               <Pencil className="mr-1 size-4" />
               Edit Details
             </Button>
           </div>
         )}
 
-        {/* Edit form shown when creating, rescheduling, or editing details */}
-        {(!isEdit || editMode !== "none") && (
+        {/* ─── Reschedule Mode ─── */}
+        {isEdit && editMode === "reschedule" && (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+              <p>
+                <span className="text-muted-foreground">Patient:</span>{" "}
+                <span className="font-medium">{patientName}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Provider:</span>{" "}
+                <span className="font-medium">{providerName}</span>
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="re-startTime">Start Time</Label>
+                <Input id="re-startTime" type="datetime-local" {...register("startTime")} />
+                {errors.startTime && (
+                  <p className="text-xs text-destructive">{errors.startTime.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="re-endTime">End Time</Label>
+                <Input id="re-endTime" type="datetime-local" {...register("endTime")} />
+                {errors.endTime && (
+                  <p className="text-xs text-destructive">{errors.endTime.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="re-reason">Reschedule Reason (optional)</Label>
+              <textarea
+                id="re-reason"
+                rows={3}
+                placeholder="Reason for rescheduling..."
+                {...register("rescheduleReason")}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                This will be appended to the appointment notes.
+              </p>
+            </div>
+
+            <input type="hidden" {...register("patientId")} />
+            <input type="hidden" {...register("providerId")} />
+            <input type="hidden" {...register("title")} />
+            <input type="hidden" {...register("notes")} />
+            <input type="hidden" {...register("color")} />
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={handleBack}>
+                Back
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Reschedule"}
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {/* ─── Full Edit / New Appointment Mode ─── */}
+        {((isEdit && editMode === "full") || !isEdit) && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="patientId">Patient</Label>
@@ -423,8 +472,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
                 <select
                   id="patientId"
                   {...register("patientId")}
-                  disabled={isEdit && editMode === "details"}
-                  className="flex h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <option value="">Select a patient...</option>
                   {patients?.map((p) => (
@@ -450,14 +498,13 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
               )}
             </div>
 
-            {showProviderSelect && (
+            {(role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit) && (
               <div className="space-y-2">
                 <Label htmlFor="providerId">Provider</Label>
                 <select
                   id="providerId"
                   {...register("providerId")}
-                  disabled={isEdit && editMode === "details"}
-                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <option value="">Select a provider...</option>
                   {providers?.map((p) => (
@@ -472,33 +519,26 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
               </div>
             )}
 
-            {editMode !== "details" && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time</Label>
-                  <Input id="startTime" type="datetime-local" {...register("startTime")} />
-                  {errors.startTime && (
-                    <p className="text-xs text-destructive">{errors.startTime.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time</Label>
-                  <Input id="endTime" type="datetime-local" {...register("endTime")} />
-                  {errors.endTime && (
-                    <p className="text-xs text-destructive">{errors.endTime.message}</p>
-                  )}
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Start Time</Label>
+                <Input id="startTime" type="datetime-local" {...register("startTime")} />
+                {errors.startTime && (
+                  <p className="text-xs text-destructive">{errors.startTime.message}</p>
+                )}
               </div>
-            )}
+              <div className="space-y-2">
+                <Label htmlFor="endTime">End Time</Label>
+                <Input id="endTime" type="datetime-local" {...register("endTime")} />
+                {errors.endTime && (
+                  <p className="text-xs text-destructive">{errors.endTime.message}</p>
+                )}
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="title">Title (optional)</Label>
-              <Input
-                id="title"
-                placeholder="e.g. Follow-up visit"
-                {...register("title")}
-                disabled={isEdit && editMode === "reschedule"}
-              />
+              <Input id="title" placeholder="e.g. Follow-up visit" {...register("title")} />
             </div>
 
             <div className="space-y-2">
@@ -508,36 +548,33 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
                 rows={3}
                 placeholder="Any additional notes..."
                 {...register("notes")}
-                disabled={isEdit && editMode === "reschedule"}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground resize-none"
               />
             </div>
 
-            {!isEdit && (
-              <div className="space-y-2">
-                <Label>Appointment Color</Label>
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      title={c.label}
-                      onClick={() => handleColorSelect(c.value)}
-                      className={`size-7 rounded-full border-2 transition-all hover:scale-110 ${
-                        watchedColor === c.value
-                          ? "border-foreground scale-110"
-                          : "border-transparent"
-                      }`}
-                      style={{ backgroundColor: c.value }}
-                    />
-                  ))}
-                </div>
+            <div className="space-y-2">
+              <Label>Appointment Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    title={c.label}
+                    onClick={() => setValue("color", c.value)}
+                    className={`size-7 rounded-full border-2 transition-all hover:scale-110 ${
+                      watchedColor === c.value
+                        ? "border-foreground scale-110"
+                        : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c.value }}
+                  />
+                ))}
               </div>
-            )}
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={handleClose}>
-                {isEdit ? "Close" : "Cancel"}
+              <Button type="button" variant="outline" onClick={isEdit ? handleBack : handleClose}>
+                {isEdit ? "Back" : "Cancel"}
               </Button>
               {isEdit && canEdit && (
                 <Button
@@ -549,33 +586,14 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
                   {deleting ? "Deleting..." : "Delete Appointment"}
                 </Button>
               )}
-              {isEdit && canCancel && editMode === "none" && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                >
-                  {cancelling ? "Cancelling..." : "Cancel Appointment"}
-                </Button>
-              )}
-              {(!isEdit || (isEdit && editMode !== "none" && canEdit)) && (
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? "Saving..."
-                    : isEdit
-                      ? editMode === "reschedule"
-                        ? "Save Reschedule"
-                        : editMode === "details"
-                          ? "Save Details"
-                          : "Save Changes"
-                      : "Book Appointment"}
-                </Button>
-              )}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Book Appointment"}
+              </Button>
             </div>
           </form>
         )}
 
+        {/* ─── View Mode Footer Buttons ─── */}
         {isEdit && editMode === "none" && (
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={handleClose}>
