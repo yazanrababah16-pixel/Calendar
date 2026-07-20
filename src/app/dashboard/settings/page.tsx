@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,8 +15,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toaster";
-import { Mail, Shield, User, Key, Users, Lock, Save } from "lucide-react";
+import { Mail, Shield, User, Key, Users, Lock, Save, Search, X } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -31,11 +32,16 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-const passwordSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(8, "New password must be at least 8 characters"),
-  confirmPassword: z.string().min(1, "Please confirm your new password"),
-});
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(8, "New password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your new password"),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
@@ -232,8 +238,15 @@ function AdminUserSection() {
   const [error, setError] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [resetting, setResetting] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error: queryError,
+  } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: async () => {
       const result = await listUsers();
@@ -243,10 +256,30 @@ function AdminUserSection() {
     enabled: true,
   });
 
+  const filteredUsers = useMemo(() => {
+    if (!data) return [];
+    if (!searchQuery) return data;
+    const q = searchQuery.toLowerCase();
+    return data.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.username?.toLowerCase() ?? "").includes(q) ||
+        u.role.toLowerCase().includes(q),
+    );
+  }, [data, searchQuery]);
+
+  const selectedUser = useMemo(
+    () => data?.find((u) => u.id === selectedUserId),
+    [data, selectedUserId],
+  );
+
   const handleResetPassword = useCallback(async () => {
     if (!selectedUserId || !newPassword) return;
     setError(null);
+    setResetting(true);
     const result = await updateUserPassword(selectedUserId, newPassword);
+    setResetting(false);
     if (result.success) {
       setNewPassword("");
       toast({ title: "Password updated", type: "success" });
@@ -272,43 +305,103 @@ function AdminUserSection() {
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="userSelect">Select User</Label>
-          <select
-            id="userSelect"
-            value={selectedUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <option value="">Choose a user...</option>
-            {isLoading && <option disabled>Loading...</option>}
-            {data?.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.email}) &mdash; {u.role.toLowerCase()}
-              </option>
-            ))}
-          </select>
+          <Label htmlFor="userSearch">Search Users</Label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="userSearch"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedUserId("");
+              }}
+              placeholder="Search by name, email, username, or role..."
+              className="pl-8"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {selectedUserId && (
+        {isLoading ? (
           <div className="space-y-2">
-            <Label htmlFor="adminNewPassword">New Password</Label>
-            <div className="flex gap-2">
-              <Input
-                id="adminNewPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                onClick={handleResetPassword}
-                disabled={!newPassword || newPassword.length < 6}
-              >
-                <Key className="mr-1 size-4" />
-                Reset
-              </Button>
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-3/4" />
+          </div>
+        ) : isError ? (
+          <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {queryError?.message ?? "Failed to load users"}
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {searchQuery ? "No users match your search." : "No users found."}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <Label>Select User</Label>
+            <div className="max-h-48 overflow-y-auto space-y-1 rounded-md border p-1">
+              {filteredUsers.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => setSelectedUserId(u.id)}
+                  className={`w-full rounded-sm px-3 py-2 text-left text-sm transition-colors ${
+                    selectedUserId === u.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-accent"
+                  }`}
+                >
+                  <span className="font-medium">{u.name}</span>
+                  <span className="ml-2 text-xs opacity-70">{u.email}</span>
+                  <span className="ml-auto text-xs capitalize opacity-60">
+                    {u.role.toLowerCase()}
+                  </span>
+                  {u.username && <span className="ml-2 text-xs opacity-50">@{u.username}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedUserId && selectedUser && (
+          <div className="space-y-3 rounded-md border p-3">
+            <div className="text-sm">
+              <span className="font-medium">{selectedUser.name}</span>
+              <span className="ml-2 text-xs text-muted-foreground">
+                ({selectedUser.role.toLowerCase()})
+              </span>
+              {selectedUser.username && (
+                <span className="ml-2 text-xs text-muted-foreground">@{selectedUser.username}</span>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adminNewPassword">New Password</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="adminNewPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 chars)"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={!newPassword || newPassword.length < 6 || resetting}
+                >
+                  <Key className="mr-1 size-4" />
+                  {resetting ? "Resetting..." : "Reset"}
+                </Button>
+              </div>
             </div>
           </div>
         )}
