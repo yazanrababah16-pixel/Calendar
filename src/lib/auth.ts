@@ -43,12 +43,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token.sub && session.user) {
         session.user.id = token.sub;
         session.user.role = token.role;
+        session.user.username = token.username;
       }
       return session;
     },
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role: "ADMIN" | "PROVIDER" | "RECEPTIONIST" | "PATIENT" }).role;
+        token.username = (user as { username?: string | null }).username;
+      } else if (token.sub) {
+        const { db } = await import("@/lib/db");
+        const dbUser = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { username: true, role: true },
+        });
+        if (dbUser) {
+          token.username = dbUser.username;
+          token.role = dbUser.role;
+        }
       }
       return token;
     },
