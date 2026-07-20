@@ -89,6 +89,7 @@ model Patient {
 
   appointments    Appointment[]
   invoices        Invoice[]
+  medicalRecords  MedicalRecord[]
   patientProviders PatientProvider[]
 
   @@map("patients")
@@ -108,6 +109,7 @@ model Provider {
 
   appointments      Appointment[]
   availabilities    Availability[]
+  medicalRecords    MedicalRecord[]
   patientProviders  PatientProvider[]
   workingHours      WorkingHours[]
   leaveRequests     LeaveRequest[]
@@ -220,6 +222,7 @@ model Appointment {
   provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   invoice       Invoice?
+  medicalRecord MedicalRecord?
   workflowEvents WorkflowEvent[]
 
   @@index([patientId])
@@ -264,6 +267,28 @@ model Payment {
 
   @@index([invoiceId])
   @@map("payments")
+}
+
+model MedicalRecord {
+  id          String   @id @default(uuid())
+  diagnosis   String?
+  prescription String?
+  notes       String?
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  patientId String @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  providerId String @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  appointmentId String @unique @map("appointment_id")
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([providerId])
+  @@map("medical_records")
 }
 
 model Availability {

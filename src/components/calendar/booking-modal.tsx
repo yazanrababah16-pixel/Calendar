@@ -31,7 +31,18 @@ import { useToast } from "@/components/ui/toaster";
 import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
 import { GenerateInvoiceDialog } from "@/components/billing/generate-invoice-dialog";
 import { getInvoiceByAppointment } from "@/server/actions/billing";
-import { Bell, CheckCircle2, Clock, XCircle, Plus, Pencil, Calendar, Receipt } from "lucide-react";
+import { getMedicalRecord, addMedicalRecord } from "@/server/actions/clinical";
+import {
+  Bell,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Plus,
+  Pencil,
+  Calendar,
+  Receipt,
+  Stethoscope,
+} from "lucide-react";
 import type { WorkflowEventInfo } from "@/lib/queries/appointments";
 
 function toLocalDatetimeString(utcIso: string): string {
@@ -127,6 +138,9 @@ export function BookingModal({
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [editMode, setEditMode] = useState<"none" | "reschedule" | "full">("none");
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
+  const [emrOpen, setEmrOpen] = useState(false);
+  const [emrForm, setEmrForm] = useState({ diagnosis: "", prescription: "", notes: "" });
+  const [emrSubmitting, setEmrSubmitting] = useState(false);
   const { toast } = useToast();
 
   const { data: invoiceData } = useQuery({
@@ -138,6 +152,17 @@ export function BookingModal({
       return result.data;
     },
     enabled: !!appointment && editMode === "none",
+  });
+
+  const { data: medicalRecord } = useQuery({
+    queryKey: ["medicalRecord", appointment?.id],
+    queryFn: async () => {
+      if (!appointment) return null;
+      const result = await getMedicalRecord(appointment.id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!appointment && emrOpen,
   });
 
   const { data: allProviders } = useQuery(providersQuery({ isActive: true }));
@@ -287,6 +312,26 @@ export function BookingModal({
       toast({ title: "Delete failed", description: result.error, type: "error" });
     }
   }, [appointment, queryClient, onOpenChange, toast]);
+
+  const handleEmrSubmit = useCallback(async () => {
+    if (!appointment) return;
+    setEmrSubmitting(true);
+    setError(null);
+    const formData = new FormData();
+    formData.set("appointmentId", appointment.id);
+    formData.set("diagnosis", emrForm.diagnosis);
+    formData.set("prescription", emrForm.prescription);
+    formData.set("notes", emrForm.notes);
+    const result = await addMedicalRecord(formData);
+    setEmrSubmitting(false);
+    if (result.success) {
+      toast({ title: "Medical record saved", type: "success" });
+      queryClient.invalidateQueries({ queryKey: ["medicalRecord"] });
+      setEmrOpen(false);
+    } else {
+      toast({ title: "Error", description: result.error, type: "error" });
+    }
+  }, [appointment, emrForm, queryClient, toast]);
 
   const handlePatientCreated = useCallback(
     (newPatientId: string) => {
@@ -463,6 +508,20 @@ export function BookingModal({
                   Generate Invoice
                 </Button>
               ))}
+            {(role === "PROVIDER" || role === "ADMIN") && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEmrOpen(true);
+                  setEmrForm({ diagnosis: "", prescription: "", notes: "" });
+                }}
+              >
+                <Stethoscope className="mr-1 size-4" />
+                Clinical Notes
+              </Button>
+            )}
           </div>
         )}
 
@@ -707,6 +766,104 @@ export function BookingModal({
               queryClient.invalidateQueries({ queryKey: ["appointmentInvoice"] });
             }}
           />
+        )}
+
+        {/* ─── EMR / Clinical Notes Modal ─── */}
+        {appointment && (
+          <Dialog open={emrOpen} onOpenChange={setEmrOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Clinical Notes</DialogTitle>
+                <DialogDescription>
+                  {new Date(appointment.startTime).toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  {" — "}
+                  {format(new Date(appointment.startTime), "h:mm a")}
+                </DialogDescription>
+              </DialogHeader>
+
+              {medicalRecord && !emrForm.diagnosis && !emrForm.prescription && !emrForm.notes && (
+                <div className="rounded-lg border p-4 space-y-3 text-sm">
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Diagnosis</span>
+                    <p className="mt-0.5">{medicalRecord.diagnosis || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Prescription</span>
+                    <p className="mt-0.5 whitespace-pre-wrap">
+                      {medicalRecord.prescription || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Notes</span>
+                    <p className="mt-0.5 whitespace-pre-wrap">{medicalRecord.notes || "—"}</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Recorded by Dr. {medicalRecord.provider.user.name} on{" "}
+                    {new Date(medicalRecord.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {(role === "PROVIDER" || role === "ADMIN") && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="emr-diagnosis">Diagnosis</Label>
+                    <Input
+                      id="emr-diagnosis"
+                      placeholder="e.g. Acute sinusitis"
+                      value={emrForm.diagnosis}
+                      onChange={(e) => setEmrForm((f) => ({ ...f, diagnosis: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emr-prescription">Prescription</Label>
+                    <textarea
+                      id="emr-prescription"
+                      rows={3}
+                      placeholder="e.g. Amoxicillin 500mg — 3x daily for 7 days"
+                      value={emrForm.prescription}
+                      onChange={(e) => setEmrForm((f) => ({ ...f, prescription: e.target.value }))}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground resize-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="emr-notes">Additional Notes</Label>
+                    <textarea
+                      id="emr-notes"
+                      rows={3}
+                      placeholder="Any additional observations..."
+                      value={emrForm.notes}
+                      onChange={(e) => setEmrForm((f) => ({ ...f, notes: e.target.value }))}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 placeholder:text-muted-foreground resize-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button type="button" variant="outline" onClick={() => setEmrOpen(false)}>
+                      Close
+                    </Button>
+                    <Button onClick={handleEmrSubmit} disabled={emrSubmitting}>
+                      {emrSubmitting
+                        ? "Saving..."
+                        : medicalRecord
+                          ? "Update Record"
+                          : "Save Record"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         )}
       </DialogContent>
     </Dialog>
