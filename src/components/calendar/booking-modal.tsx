@@ -29,7 +29,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toaster";
 import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
-import { Bell, CheckCircle2, Clock, XCircle, Plus, Pencil, Calendar } from "lucide-react";
+import { GenerateInvoiceDialog } from "@/components/billing/generate-invoice-dialog";
+import { getInvoiceByAppointment } from "@/server/actions/billing";
+import { Bell, CheckCircle2, Clock, XCircle, Plus, Pencil, Calendar, Receipt } from "lucide-react";
 import type { WorkflowEventInfo } from "@/lib/queries/appointments";
 
 function toLocalDatetimeString(utcIso: string): string {
@@ -124,7 +126,19 @@ export function BookingModal({
   const [deleting, setDeleting] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [editMode, setEditMode] = useState<"none" | "reschedule" | "full">("none");
+  const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
   const { toast } = useToast();
+
+  const { data: invoiceData } = useQuery({
+    queryKey: ["appointmentInvoice", appointment?.id],
+    queryFn: async () => {
+      if (!appointment) return null;
+      const result = await getInvoiceByAppointment(appointment.id);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!appointment && editMode === "none",
+  });
 
   const { data: allProviders } = useQuery(providersQuery({ isActive: true }));
   const { data: patients } = useQuery(patientsQuery());
@@ -429,6 +443,26 @@ export function BookingModal({
               <Pencil className="mr-1 size-4" />
               Edit Details
             </Button>
+            {(role === "ADMIN" || role === "RECEPTIONIST") &&
+              (invoiceData ? (
+                <a
+                  href="/dashboard/billing"
+                  className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm font-medium text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <Receipt className="size-4" />
+                  View Invoice
+                </a>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGenerateInvoiceOpen(true)}
+                >
+                  <Receipt className="mr-1 size-4" />
+                  Generate Invoice
+                </Button>
+              ))}
           </div>
         )}
 
@@ -664,6 +698,16 @@ export function BookingModal({
           onOpenChange={setAddPatientOpen}
           onPatientCreated={handlePatientCreated}
         />
+        {appointment && (
+          <GenerateInvoiceDialog
+            open={generateInvoiceOpen}
+            onOpenChange={setGenerateInvoiceOpen}
+            appointmentId={appointment.id}
+            onInvoiceCreated={() => {
+              queryClient.invalidateQueries({ queryKey: ["appointmentInvoice"] });
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

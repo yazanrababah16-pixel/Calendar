@@ -179,6 +179,41 @@ export async function getPatientInvoices(
   };
 }
 
+export async function getInvoiceByAppointment(
+  appointmentId: string,
+): Promise<ActionResult<InvoiceWithPayments | null>> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  const invoice = await db.invoice.findUnique({
+    where: { appointmentId },
+    include: {
+      payments: { orderBy: { paidAt: "desc" } },
+      appointment: {
+        include: {
+          provider: { include: { user: { select: { name: true } } } },
+        },
+      },
+      patient: {
+        include: { user: { select: { name: true, email: true } } },
+      },
+    },
+  });
+  if (!invoice) return { success: true, data: null };
+
+  return {
+    success: true,
+    data: {
+      ...invoice,
+      totalAmount: Number(invoice.totalAmount),
+      payments: invoice.payments.map((p) => ({
+        ...p,
+        amount: Number(p.amount),
+      })),
+    },
+  };
+}
+
 export async function getInvoiceById(
   invoiceId: string,
 ): Promise<ActionResult<InvoiceWithPayments>> {

@@ -11,11 +11,12 @@ Add a complete billing and payment tracking system. Receptionists generate invoi
 | 1   | **P1**   | **Database**     | `prisma/schema.prisma`                                     | ALL          | Add `Invoice` and `Payment` models with enums; link Invoice 1:1 to Appointment, 1:N to Patient; link Payment M:1 to Invoice                                                                                        | —                                    |
 | 2   | **P1**   | **Billing**      | `src/server/actions/billing.ts` (new)                      | RECEPTIONIST | `generateInvoiceForAppointment(appointmentId, amount)` — creates Invoice; `addPayment(invoiceId, amount, method)` — creates Payment & auto-updates Invoice status; `getPatientInvoices(patientId)` — list invoices | —                                    |
 | 3   | P2       | **Receptionist** | `src/components/billing/generate-invoice-dialog.tsx` (new) | RECEPTIONIST | Open from appointment detail/view; input amount; on submit creates invoice linked to patient; show success with invoice ID                                                                                         | `generateInvoiceForAppointment`      |
-| 4   | P2       | **Receptionist** | `src/components/billing/add-payment-dialog.tsx` (new)      | RECEPTIONIST | Open from invoice view; select method (CASH/CARD/INSURANCE), input amount; auto-update invoice status to PARTIAL or PAID                                                                                           | `addPayment`                         |
-| 5   | P2       | **Receptionist** | `src/app/dashboard/billing/page.tsx` (new)                 | RECEPTIONIST | Invoice list with filters (status, patient), total balance, quick action to add payment; expandable rows showing payment history                                                                                   | `listInvoices`, `getPatientInvoices` |
+| 4   | P2       | **Receptionist** | `src/components/billing/payment-modal.tsx` (new)           | RECEPTIONIST | Open from billing table; select method (CASH/CARD/INSURANCE), input amount; auto-update invoice status to PARTIAL or PAID                                                                                          | `addPayment`                         |
+| 5   | P2       | **Receptionist** | `src/app/dashboard/billing/page.tsx` (new)                 | RECEPTIONIST | Invoice list with summary cards (total/collected/outstanding), Record Payment button per row with balance due                                                                                                      | `listInvoices`, `getPatientInvoices` |
 | 6   | P2       | **Receptionist** | `src/app/dashboard/billing/invoices/[id]/page.tsx` (new)   | RECEPTIONIST | Invoice detail with payment timeline; add-payment button; show remaining balance                                                                                                                                   | `getInvoiceById`, `addPayment`       |
 | 7   | P2       | **Provider**     | `src/app/dashboard/financials/page.tsx` (new)              | PROVIDER     | Revenue summary (total, collected, outstanding) for appointments assigned to this provider; list of invoices scoped to their appointments; date range filter                                                       | `getProviderFinancials`              |
-| 8   | P2       | **Provider**     | `src/app/dashboard/financials/page.tsx`                    | PATIENT      | Read-only invoice history; show status and payment breakdown                                                                                                                                                       | `getPatientInvoices` (existing)      |
+| 8   | P2       | **Patient**      | `/dashboard/billing` (read-only)                           | PATIENT      | Read-only invoice history; show status and payment breakdown                                                                                                                                                       | `getPatientInvoices` (existing)      |
+| 9   | P2       | **Calendar**     | `src/components/calendar/booking-modal.tsx`                | RECEPTIONIST | "Generate Invoice" / "View Invoice" button in appointment details view; checks if invoice exists via `getInvoiceByAppointment`                                                                                     | `getInvoiceByAppointment`            |
 
 ---
 
@@ -87,9 +88,9 @@ erDiagram
 
 ## 3. Receptionist Billing UI
 
-- [ ] Create `GenerateInvoiceDialog` component — opens from appointment detail; input amount; creates invoice
-- [ ] Create `AddPaymentDialog` component — opens from invoice view; method + amount; auto-updates status
-- [ ] Create `/dashboard/billing` page — invoice list with filters (status, patient); expandable rows showing payment history; total/collected/outstanding summary
+- [x] Create `GenerateInvoiceDialog` component (`src/components/billing/generate-invoice-dialog.tsx`) — opens from appointment detail; input amount; creates invoice
+- [x] Create `PaymentModal` component (`src/components/billing/payment-modal.tsx`) — opens from billing table; method + amount; auto-updates invoice status
+- [x] Create `/dashboard/billing` page — invoice list with summary cards (total/collected/outstanding); Record Payment button per row with balance due
 - [ ] Create `/dashboard/billing/invoices/[id]` detail page — full invoice info with payment timeline, remaining balance, add-payment action
 
 ## 4. Provider Financial Dashboard
@@ -101,14 +102,15 @@ erDiagram
 
 ## 5. Implementation Order
 
-| Priority | Module                      | Depends On | Estimated Files          |
-| -------- | --------------------------- | ---------- | ------------------------ |
-| P1       | 1. Database Schema          | —          | 1 (schema) + 1 migration |
-| P1       | 2. Billing Server Actions   | 1          | 1 (action file)          |
-| P2       | 3.1 GenerateInvoiceDialog   | 2          | 1 (component)            |
-| P2       | 3.2 AddPaymentDialog        | 2          | 1 (component)            |
-| P2       | 3.3 Billing Page (list)     | 3.1, 3.2   | 1 (page)                 |
-| P2       | 3.4 Invoice Detail Page     | 3.1, 3.2   | 1 (page)                 |
-| P2       | 4.1 Provider Financial Page | 3.3, 3.4   | 1 (page)                 |
+| Priority | Module                      | Depends On | Estimated Files               |
+| -------- | --------------------------- | ---------- | ----------------------------- |
+| P1       | 1. Database Schema          | —          | 1 (schema) + 1 migration      |
+| P1       | 2. Billing Server Actions   | 1          | 1 (action file)               |
+| P2       | 3.1 GenerateInvoiceDialog   | 2          | 1 (component)                 |
+| P2       | 3.2 PaymentModal            | 2          | 1 (component)                 |
+| P2       | 3.3 Billing Page (list)     | 3.1, 3.2   | 1 (page)                      |
+| P2       | 3.4 Invoice Detail Page     | 3.1, 3.2   | 1 (page)                      |
+| P2       | 3.5 Calendar Integration    | 3.1        | 1 (existing component update) |
+| P2       | 4.1 Provider Financial Page | 3.3, 3.4   | 1 (page)                      |
 
 > **Next**: Schema expansion and core server actions first. Then receptionist billing UI. Provider financial dashboard last.
