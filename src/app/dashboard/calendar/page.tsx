@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAssignedProviders, getCurrentProvider } from "@/server/actions/providers";
+import { getCurrentPatient, getMyLinkedProviders } from "@/server/actions/patient-linking";
 
 type AppointmentData = {
   id: string;
@@ -53,31 +54,53 @@ export default function CalendarPage() {
     enabled: role === "PROVIDER",
   });
 
-  const providerFilter = useMemo(() => {
-    if (role === "ADMIN") return undefined;
-    if (role === "PROVIDER") return currentProviderResult?.id;
-    if (role === "RECEPTIONIST" && selectedProviderId) return selectedProviderId;
-    return undefined;
-  }, [role, currentProviderResult, selectedProviderId]);
+  const { data: patientResult } = useQuery({
+    queryKey: ["currentPatient"],
+    queryFn: async () => {
+      const result = await getCurrentPatient();
+      if (!result.success) throw new Error(result.error);
+      return result.patient;
+    },
+    enabled: role === "PATIENT",
+  });
 
-  const {
-    data: appointments,
-    isLoading,
-    isError,
-    error,
-  } = useQuery(appointmentsQuery(providerFilter ? { providerId: providerFilter } : undefined));
+  const { data: linkedProviders } = useQuery({
+    queryKey: ["myLinkedProviders"],
+    queryFn: async () => {
+      const result = await getMyLinkedProviders();
+      if (!result.success) throw new Error(result.error);
+      return result.doctors;
+    },
+    enabled: role === "PATIENT",
+  });
+
+  const filter = useMemo(() => {
+    if (role === "ADMIN") return undefined;
+    if (role === "PROVIDER") return { providerId: currentProviderResult?.id };
+    if (role === "RECEPTIONIST" && selectedProviderId) return { providerId: selectedProviderId };
+    if (role === "PATIENT") return { patientId: patientResult?.id };
+    return undefined;
+  }, [role, currentProviderResult, selectedProviderId, patientResult]);
+
+  const { data: appointments, isLoading, isError, error } = useQuery(appointmentsQuery(filter));
 
   const scopedProviders = useMemo(() => {
     if (role === "ADMIN") return undefined;
     if (role === "PROVIDER") return currentProviderResult ? [currentProviderResult] : undefined;
     if (role === "RECEPTIONIST") return assignedResult;
+    if (role === "PATIENT") return linkedProviders;
     return undefined;
-  }, [role, assignedResult, currentProviderResult]);
+  }, [role, assignedResult, currentProviderResult, linkedProviders]);
 
   const lockedProviderId = useMemo(() => {
     if (role === "PROVIDER") return currentProviderResult?.id;
     return undefined;
   }, [role, currentProviderResult]);
+
+  const lockedPatientId = useMemo(() => {
+    if (role === "PATIENT") return patientResult?.id;
+    return undefined;
+  }, [role, patientResult]);
 
   const handleAppointmentClick = useCallback(
     (id: string) => {
@@ -98,7 +121,9 @@ export default function CalendarPage() {
       ? isLoading || !assignedResult
       : role === "PROVIDER"
         ? isLoading || !currentProviderResult
-        : isLoading;
+        : role === "PATIENT"
+          ? isLoading || !patientResult || !linkedProviders
+          : isLoading;
 
   if (loading) {
     return (
@@ -163,6 +188,20 @@ export default function CalendarPage() {
           <span className="font-medium text-foreground">{currentProviderResult.user.name}</span>
         </div>
       )}
+      {role === "PATIENT" && linkedProviders && linkedProviders.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Showing appointments for your linked doctors
+        </div>
+      )}
+      {role === "PATIENT" && linkedProviders?.length === 0 && (
+        <div className="rounded-md border bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          You are not linked to any doctors yet. Use the{" "}
+          <a href="/dashboard" className="font-medium underline underline-offset-2">
+            Dashboard
+          </a>{" "}
+          to link to a provider.
+        </div>
+      )}
 
       <CalendarView
         appointments={appointments ?? []}
@@ -180,6 +219,7 @@ export default function CalendarPage() {
         appointment={selectedAppointment}
         scopedProviders={scopedProviders}
         lockedProviderId={lockedProviderId}
+        lockedPatientId={lockedPatientId}
       />
     </div>
   );

@@ -6,7 +6,7 @@
 | --- | -------- | ---------------- | ------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | 1   | P2       | **Global**       | `src/app/dashboard/settings/page.tsx`                         | ALL                    | **Profile section** — Name, Email, Username edit with Zod validation, loading state, success toast; **Password section** — Current/New/Confirm with client-side match check; **Admin section** — User select with search, inline password reset | `updateProfile`, `changePassword`, `listUsers`, `updateUserPassword` |
 | 2   | P2       | **Global**       | `src/components/layout/sidebar.tsx`                           | ALL                    | RBAC nav items per role table (see §5.2); highlight active; collapse on mobile                                                                                                                                                                  | —                                                                    |
-| 3   | P2       | **Global**       | `src/components/ui/role-guard.tsx` (new)                      | ALL                    | `<RoleGuard allowedRoles={[...]}>` wrapper hides children if role mismatch                                                                                                                                                                      | —                                                                    |
+| 3   | P2       | **Global**       | `src/components/auth/role-guard.tsx` (new)                    | ALL                    | `<RoleGuard allowedRoles={[...]}>` wrapper hides children if role mismatch                                                                                                                                                                      | —                                                                    |
 | 4   | P2       | **Global**       | `src/components/notifications/notification-bell.tsx` (new)    | RECEPTIONIST, PROVIDER | Bell icon in header; unread count badge; dropdown of recent notifications; mark-as-read action                                                                                                                                                  | `getNotifications`, `markNotificationRead`                           |
 | 5   | **P1**   | **Receptionist** | `src/app/dashboard/calendar/page.tsx`                         | RECEPTIONIST           | Scope to assigned providers; provider filter chip bar; show only appointments for those providers                                                                                                                                               | `getAssignedProviders`, `getAppointments` (scoped)                   |
 | 6   | **P1**   | **Receptionist** | `src/components/calendar/booking-modal.tsx`                   | RECEPTIONIST           | Scope provider dropdown to assigned providers; auto-select if only one; overlap detection                                                                                                                                                       | `getAssignedProviders`, `getAppointments`                            |
@@ -22,7 +22,7 @@
 | 16  | **P1**   | **Provider**     | `src/app/dashboard/calendar/page.tsx`                         | PROVIDER               | Filter to own appointments; shade working hours; block leave days                                                                                                                                                                               | `getAppointments` (scoped)                                           |
 | 17  | P2       | **Patient**      | `src/app/dashboard/page.tsx`                                  | PATIENT                | Upcoming appointments card; quick "Book Appointment" button; linked doctors list                                                                                                                                                                | `getMyAppointments`, `getLinkedProviders`                            |
 | 18  | P2       | **Patient**      | `src/components/patients/link-by-username.tsx` (new)          | PATIENT                | Input doctor's username → search → link; show "My Doctors" with unlink                                                                                                                                                                          | `linkPatientToProviderByUsername`                                    |
-| 19  | P2       | **Patient**      | `src/components/calendar/booking-modal.tsx`                   | PATIENT                | Scope provider dropdown to linked providers only; auto-select if one                                                                                                                                                                            | `getLinkedProviders`                                                 |
+| 19  | P2       | **Patient**      | `src/components/calendar/booking-modal.tsx`                   | PATIENT                | Scope provider dropdown to linked providers only; auto-lock & hide patient field; checkAvailability enforced                                                                                                                                    | `getLinkedProviders`, `getCurrentPatient`                            |
 | 20  | P2       | **Patient**      | `src/app/dashboard/appointments/page.tsx`                     | PATIENT                | Past appointment history; status, color, read-only detail                                                                                                                                                                                       | `getMyAppointments`                                                  |
 
 ---
@@ -156,17 +156,25 @@
 
 ### 4.2 Provider Linking via Username
 
-- [ ] Create `LinkProviderByUsername` component
+- [x] Create `LinkProviderByUsername` component (`src/components/patients/link-by-username.tsx`)
   - Input: doctor's username
   - On submit: look up User by username → check role is PROVIDER → create `PatientProvider` link
   - Show "My Doctors" list with unlink option
-  - Server action: `linkPatientToProviderByUsername(patientId, username)`
-- [ ] Add username display to Provider profile cards so patients can easily share/find their doctor
+  - Server action: `linkPatientToProviderByUsername(username)` (patient derived from session)
+- [x] Add username display to Provider profile cards so patients can easily share/find their doctor
 
 ### 4.3 Appointment History
 
 - [x] Show past appointments with status, notes, and color indicator
 - [x] Allow patients to view but not edit past appointment details
+
+### 4.4 Patient Self-Service Booking
+
+- [x] Update calendar sidebar nav to include PATIENT role
+- [x] Calendar page fetches patient-linked providers and filters by `patientId`
+- [x] BookingModal: auto-lock & hide patient field via `lockedPatientId`, scope provider dropdown to linked providers
+- [x] Server action: `getCurrentPatient()` derive patient from session
+- [x] `checkAvailability` still enforced server-side on `bookAppointment`
 
 ---
 
@@ -174,12 +182,12 @@
 
 ### 5.1 RBAC Enforcement in UI
 
-- [ ] Create a `<RoleGuard allowedRoles={[...]}>` wrapper component that hides children when the user lacks the required role
+- [x] Create a `<RoleGuard allowedRoles={[...]}>` wrapper component (`src/components/auth/role-guard.tsx`) that hides children when the user lacks the required role
 - [ ] Audit every new page/component to ensure role checks exist on both client (UI hide) and server (action guard)
 
 ### 5.2 Navigation / Sidebar Updates
 
-- [ ] Update `src/components/layout/sidebar.tsx` to show role-appropriate nav items:
+- [x] Update `src/components/dashboard/sidebar.tsx` to show role-appropriate nav items — Calendar now includes PATIENT:
   | Item           | ADMIN | RECEPTIONIST | PROVIDER | PATIENT |
   | -------------- | ----- | ------------ | -------- | ------- |
   | Calendar       | ✓     | ✓ (scoped)   | ✓ (own)  | ✓       |
@@ -188,7 +196,7 @@
   | Providers      | ✓     | ✗            | ✗        | ✗       |
   | Working Hours  | ✗     | ✗            | ✓        | ✗       |
   | Leave Requests | ✗     | ✗            | ✓        | ✗       |
-  | Settings       | ✓     | ✓            | ✓        | ✓       |
+  | Settings       | ✓     | ✓            | ✓        | ✗       |
 
 ### 5.3 Notification Badge
 
@@ -220,6 +228,7 @@
 | P2       | 4.1 Patient Dashboard        | —              | 2 (page, component)           |
 | P2       | 4.2 Provider Linking         | 4.1            | 2 (component, action)         |
 | P2       | 4.3 Appointment History      | 4.1            | 1 (component)                 |
+| P2       | 4.4 Self-Service Booking     | 4.2, 5.2       | 2 (modal, calendar page)      |
 | P2       | 5.1 RoleGuard                | —              | 1 (component)                 |
 | P2       | 5.2 Sidebar update           | —              | 1 (layout)                    |
 | P3       | 3.3 Notify Receptionist      | 3.2, 5.3       | 2 (component, action)         |

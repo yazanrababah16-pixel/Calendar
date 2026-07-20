@@ -86,6 +86,7 @@ type BookingModalProps = {
   };
   scopedProviders?: Array<{ id: string; user: { name: string; email: string } }>;
   lockedProviderId?: string;
+  lockedPatientId?: string;
 };
 
 const statusLabels: Record<string, string> = {
@@ -113,6 +114,7 @@ export function BookingModal({
   appointment,
   scopedProviders,
   lockedProviderId,
+  lockedPatientId,
 }: BookingModalProps) {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -142,7 +144,7 @@ export function BookingModal({
 
   const buildFormDefaults = useCallback(
     (): BookingFormData => ({
-      patientId: appointment?.patientId ?? "",
+      patientId: lockedPatientId ?? appointment?.patientId ?? "",
       providerId: lockedProviderId ?? appointment?.providerId ?? "",
       startTime: appointment?.startTime
         ? toLocalDatetimeString(appointment.startTime)
@@ -157,7 +159,7 @@ export function BookingModal({
       color: appointment?.color ?? "#3b82f6",
       rescheduleReason: "",
     }),
-    [appointment, defaultStart, defaultEnd, lockedProviderId],
+    [appointment, defaultStart, defaultEnd, lockedProviderId, lockedPatientId],
   );
 
   const {
@@ -495,61 +497,63 @@ export function BookingModal({
         {/* ─── Full Edit / New Appointment Mode ─── */}
         {((isEdit && editMode === "full") || !isEdit) && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="patientId">Patient</Label>
-              <div className="flex gap-2">
-                <select
-                  id="patientId"
-                  {...register("patientId")}
-                  className="flex h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="">Select a patient...</option>
-                  {patients?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.user.name}
-                    </option>
-                  ))}
-                </select>
-                {(!isEdit || canEdit) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setAddPatientOpen(true)}
-                    title="Add new patient"
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                )}
-              </div>
-              {errors.patientId && (
-                <p className="text-xs text-destructive">{errors.patientId.message}</p>
-              )}
-            </div>
-
-            {lockedProviderId ? (
-              <input type="hidden" {...register("providerId")} />
+            {lockedPatientId ? (
+              <input type="hidden" {...register("patientId")} />
             ) : (
-              (role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit) && (
-                <div className="space-y-2">
-                  <Label htmlFor="providerId">Provider</Label>
+              <div className="space-y-2">
+                <Label htmlFor="patientId">Patient</Label>
+                <div className="flex gap-2">
                   <select
-                    id="providerId"
-                    {...register("providerId")}
-                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    id="patientId"
+                    {...register("patientId")}
+                    className="flex h-8 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    <option value="">Select a provider...</option>
-                    {providers?.map((p) => (
+                    <option value="">Select a patient...</option>
+                    {patients?.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.user.name}
                       </option>
                     ))}
                   </select>
-                  {errors.providerId && (
-                    <p className="text-xs text-destructive">{errors.providerId.message}</p>
+                  {(!isEdit || canEdit) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setAddPatientOpen(true)}
+                      title="Add new patient"
+                    >
+                      <Plus className="size-4" />
+                    </Button>
                   )}
                 </div>
-              )
+                {errors.patientId && (
+                  <p className="text-xs text-destructive">{errors.patientId.message}</p>
+                )}
+              </div>
+            )}
+
+            {lockedProviderId ? (
+              <input type="hidden" {...register("providerId")} />
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="providerId">Provider</Label>
+                <select
+                  id="providerId"
+                  {...register("providerId")}
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Select a provider...</option>
+                  {providers?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.user.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.providerId && (
+                  <p className="text-xs text-destructive">{errors.providerId.message}</p>
+                )}
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">

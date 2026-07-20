@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
     labelKey: "nav.calendar",
     href: "/dashboard/calendar",
     icon: Calendar,
-    roles: ["ADMIN", "PROVIDER", "RECEPTIONIST"],
+    roles: ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   },
   {
     labelKey: "nav.appointments",

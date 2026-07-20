@@ -105,6 +105,18 @@ export async function unlinkMyProvider(providerId: string) {
   return { success: true as const };
 }
 
+/** For PATIENT role: return the current patient record */
+export async function getCurrentPatient() {
+  const session = await auth();
+  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+  if (session.user.role !== "PATIENT") return { success: false as const, error: "Not a patient" };
+
+  const patient = await db.patient.findUnique({ where: { userId: session.user.id } });
+  if (!patient) return { success: false as const, error: "Patient profile not found" };
+
+  return { success: true as const, patient };
+}
+
 /** For PATIENT role: derive patient from session, return linked providers with usernames */
 export async function getMyLinkedProviders() {
   const session = await auth();
