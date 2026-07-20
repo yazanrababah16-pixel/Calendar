@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
+import { LinkByUsername } from "@/components/patients/link-by-username";
 
 const statusBadge: Record<string, string> = {
   SCHEDULED: "bg-blue-100 text-blue-700 border-blue-200",
@@ -47,7 +47,9 @@ async function PatientDashboard({ userId }: { userId: string }) {
       where: { patientId: patient.id },
       include: {
         provider: {
-          include: { user: { select: { id: true, name: true, email: true, image: true } } },
+          include: {
+            user: { select: { id: true, name: true, email: true, username: true, image: true } },
+          },
         },
       },
     }),
@@ -86,37 +88,26 @@ async function PatientDashboard({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-8">
-      {/* My Doctors */}
+      {/* My Doctors + Link by Username */}
       <section>
         <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
           <Stethoscope className="size-5 text-primary" />
           My Doctors
         </h2>
-        {doctors.length === 0 ? (
-          <Card>
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              No doctors are linked to you yet. Ask the receptionist to link you to a provider.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {doctors.map((doc) => (
-              <Card key={doc.id}>
-                <CardContent className="flex items-center gap-3 pt-6">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {(doc.user.name[0] ?? "?").toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{doc.user.name}</p>
-                    {doc.specialty && (
-                      <p className="text-xs text-muted-foreground">{doc.specialty}</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        <LinkByUsername
+          doctors={links.map((l) => ({
+            id: l.provider.id,
+            specialty: l.provider.specialty,
+            user: {
+              id: l.provider.user.id,
+              name: l.provider.user.name,
+              email: l.provider.user.email,
+              username: l.provider.user.username,
+              image: l.provider.user.image,
+            },
+            linkedAt: l.createdAt.toISOString(),
+          }))}
+        />
       </section>
 
       {/* Upcoming Appointments */}
