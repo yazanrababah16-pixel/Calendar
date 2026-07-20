@@ -10,6 +10,12 @@ type ActionResult = { success: true; id: string } | { success: false; error: str
 const createProviderSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email address"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30)
+    .optional()
+    .or(z.literal("")),
   password: z.string().min(6, "Password must be at least 6 characters"),
   specialty: z.string().max(200).optional().or(z.literal("")),
   phone: z.string().max(20).optional().or(z.literal("")),
@@ -28,6 +34,7 @@ export async function createProvider(
   const parsed = createProviderSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
+    username: formData.get("username") || undefined,
     password: formData.get("password"),
     specialty: formData.get("specialty") || undefined,
     phone: formData.get("phone") || undefined,
@@ -39,7 +46,7 @@ export async function createProvider(
     return { success: false, error: issue?.message ?? "Invalid input" };
   }
 
-  const { name, email, password, specialty, phone, bio } = parsed.data;
+  const { name, email, username, password, specialty, phone, bio } = parsed.data;
 
   const existingUser = await db.user.findUnique({ where: { email } });
   if (existingUser) {
@@ -66,8 +73,15 @@ export async function createProvider(
 
   const passwordHash = await bcrypt.hash(password, 12);
 
+  if (username) {
+    const existingUsername = await db.user.findUnique({ where: { username } });
+    if (existingUsername) {
+      return { success: false, error: "This username is already taken" };
+    }
+  }
+
   const user = await db.user.create({
-    data: { name, email, passwordHash, role: "PROVIDER" },
+    data: { name, email, username: username || null, passwordHash, role: "PROVIDER" },
   });
 
   await db.provider.create({

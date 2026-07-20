@@ -8,6 +8,12 @@ import { Role } from "@/generated/prisma/enums";
 const registerSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email address"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30)
+    .optional()
+    .or(z.literal("")),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
@@ -20,6 +26,7 @@ export async function register(
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
+    username: formData.get("username") || undefined,
     password: formData.get("password"),
   });
 
@@ -31,17 +38,24 @@ export async function register(
     };
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, username, password } = parsed.data;
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
     return { success: false, error: "An account with this email already exists" };
   }
 
+  if (username) {
+    const existingUsername = await db.user.findUnique({ where: { username } });
+    if (existingUsername) {
+      return { success: false, error: "This username is already taken" };
+    }
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
 
   await db.user.create({
-    data: { name, email, passwordHash, role: Role.PATIENT },
+    data: { name, email, username: username || null, passwordHash, role: Role.PATIENT },
   });
 
   return { success: true };

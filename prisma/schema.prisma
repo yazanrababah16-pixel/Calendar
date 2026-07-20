@@ -30,18 +30,36 @@ enum WorkflowEventStatus {
   FAILED
 }
 
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ACTIONED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  role      Role     @default(PATIENT)
-  image       String?
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String?  @unique
+  name         String
+  role         Role     @default(PATIENT)
+  image        String?
   passwordHash String?
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  createdAt    DateTime @default(now()) @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @db.Timestamptz()
 
   patient   Patient?
   provider  Provider?
+
+  assignedProviders     ProviderAssignment[] @relation("AssignedProviders")
+
+  sentNotifications     Notification[] @relation("SentNotifications")
+  receivedNotifications Notification[] @relation("ReceivedNotifications")
 
   @@map("users")
 }
@@ -54,30 +72,121 @@ model Patient {
   createdAt   DateTime @default(now()) @db.Timestamptz()
   updatedAt   DateTime @updatedAt @db.Timestamptz()
 
-  userId      String @unique
-  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  appointments Appointment[]
+  appointments    Appointment[]
+  patientProviders PatientProvider[]
 
   @@map("patients")
 }
 
 model Provider {
-  id          String   @id @default(uuid())
-  specialty   String?
-  phone       String?
-  bio         String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamptz()
-  updatedAt   DateTime @updatedAt @db.Timestamptz()
+  id        String   @id @default(uuid())
+  specialty String?
+  phone     String?
+  bio       String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
 
-  userId      String        @unique
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  appointments Appointment[]
-  availabilities Availability[]
+  appointments      Appointment[]
+  availabilities    Availability[]
+  patientProviders  PatientProvider[]
+  workingHours      WorkingHours[]
+  leaveRequests     LeaveRequest[]
+  providerAssignments ProviderAssignment[] @relation("ProviderAssignments")
 
   @@map("providers")
+}
+
+model PatientProvider {
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+
+  @@unique([patientId, providerId])
+  @@index([patientId])
+  @@index([providerId])
+  @@map("patient_providers")
+}
+
+model ProviderAssignment {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now()) @db.Timestamptz()
+
+  providerId String
+  provider   Provider @relation("ProviderAssignments", fields: [providerId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("AssignedProviders", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, userId])
+  @@index([providerId])
+  @@index([userId])
+  @@map("provider_assignments")
+}
+
+model WorkingHours {
+  id        String   @id @default(uuid())
+  dayOfWeek Int      // 0=Sunday, 1=Monday, etc.
+  startTime String   // "09:00"
+  endTime   String   // "17:00"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+
+  providerId String @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, dayOfWeek])
+  @@index([providerId])
+  @@map("working_hours")
+}
+
+model LeaveRequest {
+  id         String             @id @default(uuid())
+  date       DateTime           @db.Timestamptz()
+  status     LeaveRequestStatus @default(PENDING)
+  reason     String?
+  createdAt  DateTime           @default(now()) @db.Timestamptz()
+  updatedAt  DateTime           @updatedAt @db.Timestamptz()
+
+  providerId String @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([date])
+  @@map("leave_requests")
+}
+
+model Notification {
+  id                String             @id @default(uuid())
+  type              String             // "link_request", "reschedule_request", "leave_notification", etc.
+  message           String?
+  status            NotificationStatus @default(UNREAD)
+  relatedEntityId   String?
+  relatedEntityType String?            // "appointment", "leave_request", etc.
+  createdAt         DateTime           @default(now()) @db.Timestamptz()
+  updatedAt         DateTime           @updatedAt @db.Timestamptz()
+
+  senderId   String @map("sender_id")
+  sender     User   @relation("SentNotifications", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId String @map("receiver_id")
+  receiver   User   @relation("ReceivedNotifications", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, status])
+  @@index([senderId])
+  @@index([type])
+  @@map("notifications")
 }
 
 model Appointment {
