@@ -84,6 +84,8 @@ type BookingModalProps = {
     status: string;
     workflowEvents?: WorkflowEventInfo[];
   };
+  scopedProviders?: Array<{ id: string; user: { name: string; email: string } }>;
+  lockedProviderId?: string;
 };
 
 const statusLabels: Record<string, string> = {
@@ -104,7 +106,14 @@ const statusColors: Record<string, string> = {
   NO_SHOW: "text-red-600 bg-red-50",
 };
 
-export function BookingModal({ open, onOpenChange, defaultStart, appointment }: BookingModalProps) {
+export function BookingModal({
+  open,
+  onOpenChange,
+  defaultStart,
+  appointment,
+  scopedProviders,
+  lockedProviderId,
+}: BookingModalProps) {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const role = session?.user?.role;
@@ -115,8 +124,10 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const [editMode, setEditMode] = useState<"none" | "reschedule" | "full">("none");
   const { toast } = useToast();
 
-  const { data: providers } = useQuery(providersQuery({ isActive: true }));
+  const { data: allProviders } = useQuery(providersQuery({ isActive: true }));
   const { data: patients } = useQuery(patientsQuery());
+
+  const providers = scopedProviders ?? allProviders;
 
   const isEdit = !!appointment;
   const canCancel =
@@ -132,7 +143,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
   const buildFormDefaults = useCallback(
     (): BookingFormData => ({
       patientId: appointment?.patientId ?? "",
-      providerId: appointment?.providerId ?? "",
+      providerId: lockedProviderId ?? appointment?.providerId ?? "",
       startTime: appointment?.startTime
         ? toLocalDatetimeString(appointment.startTime)
         : defaultStart
@@ -146,7 +157,7 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
       color: appointment?.color ?? "#3b82f6",
       rescheduleReason: "",
     }),
-    [appointment, defaultStart, defaultEnd],
+    [appointment, defaultStart, defaultEnd, lockedProviderId],
   );
 
   const {
@@ -516,25 +527,29 @@ export function BookingModal({ open, onOpenChange, defaultStart, appointment }: 
               )}
             </div>
 
-            {(role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit) && (
-              <div className="space-y-2">
-                <Label htmlFor="providerId">Provider</Label>
-                <select
-                  id="providerId"
-                  {...register("providerId")}
-                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="">Select a provider...</option>
-                  {providers?.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.user.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.providerId && (
-                  <p className="text-xs text-destructive">{errors.providerId.message}</p>
-                )}
-              </div>
+            {lockedProviderId ? (
+              <input type="hidden" {...register("providerId")} />
+            ) : (
+              (role === "ADMIN" || role === "RECEPTIONIST" || role === "PROVIDER" || isEdit) && (
+                <div className="space-y-2">
+                  <Label htmlFor="providerId">Provider</Label>
+                  <select
+                    id="providerId"
+                    {...register("providerId")}
+                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <option value="">Select a provider...</option>
+                    {providers?.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.user.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.providerId && (
+                    <p className="text-xs text-destructive">{errors.providerId.message}</p>
+                  )}
+                </div>
+              )
             )}
 
             <div className="grid grid-cols-2 gap-4">

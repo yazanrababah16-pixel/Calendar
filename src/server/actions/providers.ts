@@ -96,6 +96,36 @@ export async function createProvider(
   return { success: true, id: user.id };
 }
 
+export async function getAssignedProviders() {
+  const session = await auth();
+  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+
+  const assignments = await db.providerAssignment.findMany({
+    where: { userId: session.user.id },
+    include: {
+      provider: {
+        include: { user: { select: { id: true, name: true, email: true } } },
+      },
+    },
+  });
+
+  const providers = assignments.map((a) => a.provider);
+  return { success: true as const, providers };
+}
+
+export async function getCurrentProvider() {
+  const session = await auth();
+  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+
+  const provider = await db.provider.findUnique({
+    where: { userId: session.user.id },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  });
+
+  if (!provider) return { success: false as const, error: "Provider profile not found" };
+  return { success: true as const, provider };
+}
+
 export async function updateProviderStatus(id: string, isActive: boolean): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user || session.user.role !== "ADMIN") {

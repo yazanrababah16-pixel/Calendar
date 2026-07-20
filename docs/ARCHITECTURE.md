@@ -224,6 +224,74 @@ erDiagram
     Appointment ||--o{ WorkflowEvent : "triggers"
 ```
 
+## Calendar RBAC — Detailed Flow
+
+### Receptionist: Managing Assigned Provider Calendars
+
+```mermaid
+sequenceDiagram
+    participant R as Receptionist (UI)
+    participant C as Calendar Page
+    participant SA as getAssignedProviders
+    participant DB as Database
+
+    R->>C: Opens /dashboard/calendar
+    C->>SA: fetchAssignedProviders()
+    SA->>DB: SELECT * FROM provider_assignments WHERE userId = session.user.id
+    DB-->>SA: [ProviderA, ProviderB]
+    SA-->>C: [ProviderA, ProviderB]
+
+    C->>C: Render provider filter dropdown<br>with [All, ProviderA, ProviderB]
+    R->>C: Selects "ProviderA"
+    C->>SA: fetchAppointments(providerId: ProviderA.id)
+    SA->>DB: SELECT * FROM appointments WHERE providerId = ProviderA.id
+    DB-->>SA: [Appointment1, Appointment2]
+    SA-->>C: [Appointment1, Appointment2]
+    C->>C: Render WeekView filtered to ProviderA
+
+    R->>C: Clicks time slot → BookingModal opens
+    C->>SA: fetchAssignedProviders() again
+    SA-->>C: [ProviderA, ProviderB]
+    C->>C: Provider dropdown shows only ProviderA, ProviderB<br>auto-selects ProviderA if only one
+    R->>C: Fills form, submits
+    C->>SA: bookAppointment(data)
+    SA->>DB: INSERT INTO appointments
+    DB-->>SA: success
+    SA-->>C: { success: true }
+    C->>C: Refetch appointments, close modal
+```
+
+### Provider: Viewing Own Schedule
+
+```mermaid
+sequenceDiagram
+    participant P as Provider (UI)
+    participant C as Calendar Page
+    participant SA as Server Actions
+    participant DB as Database
+
+    P->>C: Opens /dashboard/calendar
+    C->>SA: getCurrentProvider(session.user.id)
+    SA->>DB: SELECT * FROM providers WHERE userId = session.user.id
+    DB-->>SA: provider { id: "prov-123" }
+    SA-->>C: providerId = "prov-123"
+
+    C->>SA: fetchAppointments(providerId: "prov-123")
+    SA->>DB: SELECT * FROM appointments WHERE providerId = "prov-123"
+    DB-->>SA: [Appt1, Appt2, ...]
+    SA-->>C: [Appt1, Appt2, ...]
+
+    C->>C: Render WeekView locked to own schedule<br>No provider filter shown
+
+    P->>C: Clicks time slot → BookingModal opens
+    C->>C: Provider field hidden / disabled<br>(auto-set to own providerId)
+    P->>C: Fills form, submits
+    C->>SA: bookAppointment(data with providerId locked)
+    SA->>DB: INSERT INTO appointments
+    DB-->>SA: success
+    SA-->>C: { success: true }
+```
+
 ## Key Relationships
 
 - **User → Patient**: 1:1 (via `userId` unique on Patient)
