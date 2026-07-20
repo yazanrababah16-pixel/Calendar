@@ -17,6 +17,7 @@ export async function GET(request: Request) {
       OR: [
         { name: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
+        { username: { contains: search, mode: "insensitive" } },
       ],
     };
   }
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
   const patients = await db.patient.findMany({
     where,
     include: {
-      user: { select: { id: true, name: true, email: true, image: true } },
+      user: { select: { id: true, name: true, email: true, username: true, image: true } },
     },
     orderBy: { createdAt: "desc" },
   });

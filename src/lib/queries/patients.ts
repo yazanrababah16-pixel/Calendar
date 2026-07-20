@@ -10,7 +10,13 @@ async function fetchPatients(search?: string) {
       dateOfBirth: string | null;
       phone: string | null;
       notes: string | null;
-      user: { id: string; name: string; email: string; image: string | null };
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        username: string | null;
+        image: string | null;
+      };
     }>
   >;
 }
@@ -33,7 +39,13 @@ export function patientQuery(id: string) {
         dateOfBirth: string | null;
         phone: string | null;
         notes: string | null;
-        user: { id: string; name: string; email: string; image: string | null };
+        user: {
+          id: string;
+          name: string;
+          email: string;
+          username: string | null;
+          image: string | null;
+        };
         appointments: Array<{
           id: string;
           startTime: string;

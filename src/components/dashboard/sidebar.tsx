@@ -5,7 +5,15 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/lib/i18n/locale-context";
-import { Calendar, LayoutDashboard, Users, Stethoscope, Settings, Clock } from "lucide-react";
+import {
+  Calendar,
+  LayoutDashboard,
+  Users,
+  Stethoscope,
+  Settings,
+  Clock,
+  CalendarRange,
+} from "lucide-react";
 
 type NavItem = {
   labelKey: string;
@@ -38,6 +46,12 @@ const navItems: NavItem[] = [
     href: "/dashboard/patients",
     icon: Users,
     roles: ["ADMIN", "PROVIDER", "RECEPTIONIST"],
+  },
+  {
+    labelKey: "nav.availability",
+    href: "/dashboard/availability",
+    icon: CalendarRange,
+    roles: ["PROVIDER"],
   },
   {
     labelKey: "nav.providers",

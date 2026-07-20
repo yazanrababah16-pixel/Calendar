@@ -1,26 +1,107 @@
 "use server";
 
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { createAvailabilitySchema } from "@/lib/schemas/availability";
+import { startOfDay, endOfDay } from "date-fns";
 
-type ActionResult = { success: true; id: string } | { success: false; error: string };
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export async function createAvailabilitySlot(
-  _prevState: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+const upsertWorkingHoursSchema = z.object({
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time format"),
+  isActive: z.boolean(),
+});
+
+const leaveRequestSchema = z.object({
+  date: z.string().min(1, "Date is required"),
+  reason: z.string().max(500).optional().or(z.literal("")),
+});
+
+type ActionResult = { success: true } | { success: false; error: string };
+
+async function getProviderId(userId: string): Promise<string | null> {
+  const provider = await db.provider.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  return provider?.id ?? null;
+}
+
+export async function getWorkingHours() {
   const session = await auth();
-  if (!session?.user) {
-    return { success: false, error: "Unauthorized" };
+  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+
+  const providerId = await getProviderId(session.user.id);
+  if (!providerId) return { success: false as const, error: "Provider profile not found" };
+
+  const hours = await db.workingHours.findMany({
+    where: { providerId },
+    orderBy: { dayOfWeek: "asc" },
+  });
+
+  return { success: true as const, hours };
+}
+
+export async function upsertWorkingHours(formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  const providerId = await getProviderId(session.user.id);
+  if (!providerId) return { success: false, error: "Provider profile not found" };
+
+  const raw = formData.get("hours");
+  if (!raw) return { success: false, error: "No hours data provided" };
+
+  let hoursArray: unknown[];
+  try {
+    hoursArray = JSON.parse(raw as string);
+  } catch {
+    return { success: false, error: "Invalid hours data format" };
   }
 
-  const parsed = createAvailabilitySchema.safeParse({
-    providerId: formData.get("providerId"),
-    dayOfWeek: formData.get("dayOfWeek") ? Number(formData.get("dayOfWeek")) : undefined,
-    startTime: formData.get("startTime"),
-    endTime: formData.get("endTime"),
-    isActive: formData.get("isActive") === "true" || undefined,
+  for (const entry of hoursArray) {
+    const parsed = upsertWorkingHoursSchema.safeParse(entry);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: `Invalid entry for ${DAY_NAMES[(entry as Record<string, unknown>).dayOfWeek as number] ?? "unknown day"}`,
+      };
+    }
+  }
+
+  await db.$transaction(
+    (hoursArray as z.infer<typeof upsertWorkingHoursSchema>[]).map((entry) =>
+      db.workingHours.upsert({
+        where: {
+          providerId_dayOfWeek: { providerId, dayOfWeek: entry.dayOfWeek },
+        },
+        update: { startTime: entry.startTime, endTime: entry.endTime, isActive: entry.isActive },
+        create: {
+          providerId,
+          dayOfWeek: entry.dayOfWeek,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          isActive: entry.isActive,
+        },
+      }),
+    ),
+  );
+
+  return { success: true };
+}
+
+export async function createLeaveRequest(formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  const providerId = await getProviderId(session.user.id);
+  if (!providerId) return { success: false, error: "Provider profile not found" };
+
+  const parsed = leaveRequestSchema.safeParse({
+    date: formData.get("date"),
+    reason: formData.get("reason") || undefined,
   });
 
   if (!parsed.success) {
@@ -28,47 +109,70 @@ export async function createAvailabilitySlot(
     return { success: false, error: issue?.message ?? "Invalid input" };
   }
 
-  const existing = await db.availability.findUnique({
-    where: {
-      providerId_dayOfWeek: {
-        providerId: parsed.data.providerId,
-        dayOfWeek: parsed.data.dayOfWeek,
-      },
-    },
+  const { date, reason } = parsed.data;
+  const leaveDate = new Date(date);
+
+  const existing = await db.leaveRequest.findFirst({
+    where: { providerId, date: { gte: startOfDay(leaveDate), lte: endOfDay(leaveDate) } },
   });
 
   if (existing) {
-    return { success: false, error: "Availability for this day already exists" };
+    return { success: false, error: "A leave request already exists for this date" };
   }
 
-  const availability = await db.availability.create({
-    data: {
-      providerId: parsed.data.providerId,
-      dayOfWeek: parsed.data.dayOfWeek,
-      startTime: parsed.data.startTime,
-      endTime: parsed.data.endTime,
-      isActive: parsed.data.isActive ?? true,
+  await db.leaveRequest.create({
+    data: { providerId, date: leaveDate, reason: reason || null, status: "PENDING" },
+  });
+
+  return { success: true };
+}
+
+export async function getLeaveRequests() {
+  const session = await auth();
+  if (!session?.user) return { success: false as const, error: "Unauthorized" };
+
+  const providerId = await getProviderId(session.user.id);
+  if (!providerId) return { success: false as const, error: "Provider profile not found" };
+
+  const leaves = await db.leaveRequest.findMany({
+    where: { providerId },
+    orderBy: { date: "desc" },
+  });
+
+  return { success: true as const, leaves };
+}
+
+export async function checkAvailability(providerId: string, startTime: Date, endTime: Date) {
+  const dayOfWeek = startTime.getDay();
+  const timeStr = `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`;
+  const endTimeStr = `${String(endTime.getHours()).padStart(2, "0")}:${String(endTime.getMinutes()).padStart(2, "0")}`;
+
+  const workingHour = await db.workingHours.findUnique({
+    where: { providerId_dayOfWeek: { providerId, dayOfWeek } },
+  });
+
+  if (!workingHour || !workingHour.isActive) {
+    return { available: false, reason: "The provider is not available on this day" };
+  }
+
+  if (timeStr < workingHour.startTime || endTimeStr > workingHour.endTime) {
+    return {
+      available: false,
+      reason: `The appointment time must be between ${workingHour.startTime} and ${workingHour.endTime}`,
+    };
+  }
+
+  const leave = await db.leaveRequest.findFirst({
+    where: {
+      providerId,
+      status: { in: ["PENDING", "APPROVED"] },
+      date: { gte: startOfDay(startTime), lte: endOfDay(startTime) },
     },
   });
 
-  return { success: true, id: availability.id };
-}
-
-export async function toggleAvailabilitySlot(id: string, isActive: boolean): Promise<ActionResult> {
-  const session = await auth();
-  if (!session?.user) {
-    return { success: false, error: "Unauthorized" };
+  if (leave) {
+    return { available: false, reason: "The provider has a leave request on this date" };
   }
 
-  const existing = await db.availability.findUnique({ where: { id } });
-  if (!existing) {
-    return { success: false, error: "Availability slot not found" };
-  }
-
-  await db.availability.update({
-    where: { id },
-    data: { isActive },
-  });
-
-  return { success: true, id };
+  return { available: true, reason: null };
 }

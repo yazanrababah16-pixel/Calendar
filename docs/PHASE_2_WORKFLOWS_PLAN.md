@@ -76,32 +76,32 @@
 
 ### 2.1 Provider-Scoped Calendar View
 
-- [ ] Update `src/app/dashboard/calendar/page.tsx` (or create a receptionist-specific page)
+- [x] Update `src/app/dashboard/calendar/page.tsx` (or create a receptionist-specific page)
   - When `session.user.role === "RECEPTIONIST"`, fetch the receptionist's assigned providers (`ProviderAssignment` table)
   - Filter the calendar/appointments query to only show appointments belonging to those assigned providers
   - Add a provider filter chip bar so the receptionist can toggle which assigned provider's schedule to view
 
 ### 2.2 Appointment Scheduling (Scoped)
 
-- [ ] Update `BookingModal` to scope the Provider dropdown to the receptionist's assigned providers only
-- [ ] Hide the Provider dropdown entirely if the receptionist only has one assigned provider (auto-select)
-- [ ] Ensure overlap detection still respects provider-level constraints
+- [x] Update `BookingModal` to scope the Provider dropdown to the receptionist's assigned providers only
+- [x] Hide the Provider dropdown entirely if the receptionist only has one assigned provider (auto-select)
+- [x] Ensure overlap detection still respects provider-level constraints
 
 ### 2.3 Patient Management
 
-- [ ] Update `AddPatientDialog` / patient creation flow
+- [x] Update `AddPatientDialog` / patient creation flow
   - Pre-fill `username` field (auto-generate from email or first name if not provided)
   - On create: save user with hashed `Clinic@123` default password
   - Show the auto-generated credentials in a success banner so the receptionist can hand them to the patient
-- [ ] Patient search: allow searching by name, email, or username
+- [x] Patient search: allow searching by name, email, or username
 
 ### 2.4 Linking Patients to Providers
 
-- [ ] Create `PatientProviderLink` component (`src/components/patients/patient-provider-link.tsx`)
+- [x] Create `PatientProviderLink` component (built into `/dashboard/patients` page)
   - Form: select a patient → select an assigned provider → link
   - Server action: `linkPatientToProvider(patientId, providerId)` creating a `PatientProvider` row
   - Show existing linked pairs and an "unlink" button
-- [ ] Add a "Linked Doctors" section to the Patient detail/edit view
+- [ ] Add a "Linked Doctors" section to the Patient detail/edit view (detail page not yet updated)
 
 ### 2.5 Receptionist Notifications
 
@@ -115,19 +115,19 @@
 
 ### 3.1 Working Hours UI
 
-- [ ] Create `WorkingHoursEditor` component (`src/components/provider/working-hours-editor.tsx`)
+- [x] Create `WorkingHoursEditor` component (built into `/dashboard/availability`)
   - 7 rows (Sun–Sat), each with: active toggle, start time (HH:mm), end time (HH:mm)
   - Pre-fill from `WorkingHours` table for the current provider's `Provider.id`
   - Server action: `upsertWorkingHours(providerId, hours[])` — upserts by `[providerId, dayOfWeek]`
-- [ ] Add a "Working Hours" page or tab for Providers (`/dashboard/provider/hours` or a tab on calendar)
+- [x] Add a "Working Hours" page for Providers (`/dashboard/availability`)
 
 ### 3.2 Leave Management
 
-- [ ] Create `LeaveRequestForm` component (`src/components/provider/leave-request-form.tsx`)
+- [x] Create `LeaveRequestForm` component (built into `/dashboard/availability`)
   - Date picker, reason textarea, submit button
   - Server action: `createLeaveRequest(providerId, date, reason)` inserts into `LeaveRequest`
-- [ ] Create `LeaveRequestList` component to show past/upcoming requests and their status (PENDING / APPROVED / REJECTED)
-- [ ] Add a "Leave Requests" page for Providers (`/dashboard/provider/leaves`)
+- [x] Create `LeaveRequestList` component to show past/upcoming requests and their status (PENDING / APPROVED / REJECTED)
+- [x] Add a "Leave Requests" page for Providers (`/dashboard/availability`)
 
 ### 3.3 Notification to Receptionist
 
@@ -138,7 +138,7 @@
 
 ### 3.4 View Own Schedule
 
-- [ ] Calendar view for Provider: filter to `providerId === session.user.provider.id`
+- [x] Calendar view for Provider: filter to `providerId === session.user.provider.id`
 - [ ] Show working hours as shaded areas on the week view
 - [ ] Show leave days as blocked/highlighted on the calendar
 

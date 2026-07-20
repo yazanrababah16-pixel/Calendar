@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAppointmentSchema } from "@/lib/schemas/appointment";
 import { triggerN8nWorkflow } from "@/server/actions/n8n";
+import { checkAvailability } from "@/server/actions/availability";
 
 type ActionResult = { success: true; id: string } | { success: false; error: string };
 
@@ -37,6 +38,11 @@ export async function bookAppointment(
 
   if (start >= end) {
     return { success: false, error: "Start time must be before end time" };
+  }
+
+  const availability = await checkAvailability(providerId, start, end);
+  if (!availability.available) {
+    return { success: false, error: availability.reason! };
   }
 
   const overlapping = await db.appointment.findFirst({
@@ -143,6 +149,11 @@ export async function updateAppointment(
 
   if (start >= end) {
     return { success: false, error: "Start time must be before end time" };
+  }
+
+  const availability = await checkAvailability(providerId, start, end);
+  if (!availability.available) {
+    return { success: false, error: availability.reason! };
   }
 
   const overlapping = await db.appointment.findFirst({
