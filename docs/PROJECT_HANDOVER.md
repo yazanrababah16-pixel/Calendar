@@ -71,9 +71,15 @@ A full-stack clinic management application built with:
 - **Analytics Dashboard**: `AdminDashboard` component with recharts — BarChart (monthly revenue), PieChart (appointment status distribution), provider workload table. ADMIN-only access via `src/server/actions/analytics.ts`
 - **Production Seeding**: `prisma/seed.ts` creates 1 admin, 2 receptionists, 3 providers, 18 patients, 27 appointments, invoices with payments, medical records, working hours, and leave requests. All users login with `Clinic@123`. Cleans existing data before seeding.
 
+### Phase 5: Integration Fixes & Authentication Debugging
+
+- **n8n Workflow SQL Fix**: Corrected the `WhatsApp Booking Agent` workflow JSON (`C:\Users\yazan\OneDrive\Desktop\n8nflow\WhatsApp Booking Agent.json`) to query the actual Prisma-mapped tables (`"appointments"`, `"patients"`, `"users"`) with proper quoted identifiers. The `book_appointment` INSERT now looks up `patient_id` via phone subquery and builds `startTime` from concatenated date+time. Both PostgresTool nodes are documented with SSL-required credential setup for Neon.
+- **Neon Password Expiry — Login Fix**: Diagnosed and resolved a silent NextAuth login failure ("Invalid email or password") caused by an expired Neon database password. The `authorize` function could not connect to the database, returning `null` — indistinguishable from a wrong password. Updated `DATABASE_URL` and `DIRECT_DATABASE_URL` in `.env` with a fresh password from the Neon Console. Documented in `docs/KNOWN_ISSUES.md`.
+
 ### Git History (key commits)
 
 ```
+e2d7aa0 docs: log Neon db password expiration issue
 e418a4e feat: production seeding with 18 patients, 3 providers, appointments, invoices...
 313ac53 feat: analytics dashboard with recharts - revenue bar, status pie, provider workload
 fdc26b6 feat: add emr module schema, actions, and clinical notes ui
@@ -90,21 +96,13 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 ## 3. Current State & Pending Work
 
-### State: All Phase 1–4 features are implemented, build-passing, seeded, and pushed to `main`.
+### State: All Phase 1–5 features are implemented, build-passing, seeded, and pushed to `main`.
 
-### Next Immediate Task: **n8n WhatsApp Bot Integration**
+### Next Immediate Tasks (resume here)
 
-The foundation is already in place:
-
-- `WorkflowEvent` model exists in schema
-- `POST /api/webhooks/n8n` endpoint exists with HMAC verification and idempotency
-- `N8N_WEBHOOK_SECRET` env var expected
-
-What remains:
-
-1. Create and export an n8n JSON workflow definition file (e.g., `n8n-workflow.json`) that handles WhatsApp messaging flows
-2. Wire the webhook to trigger on relevant application events (appointment reminders, confirmations, cancellations)
-3. Update the webhook route or create additional handlers as needed for the WhatsApp bot logic
+1. **Update Vercel Environment Variables**: Deploy the database fix by updating `DATABASE_URL` and `DIRECT_DATABASE_URL` in the Vercel dashboard with the new Neon password. Currently only `.env` (local) has the updated password.
+2. **End-to-End n8n WhatsApp Bot Test**: Import the corrected `WhatsApp Booking Agent.json` into n8n, create the Postgres credential with SSL enabled, assign it to both PostgresTool nodes, activate the workflow, and verify a full booking flow end-to-end.
+3. **Wire system webhook events**: Connect appointment creation/reminder events in the app to the n8n webhook endpoint (`POST /api/webhooks/n8n`) for automated WhatsApp notifications.
 
 ### Other Known Items
 
@@ -153,4 +151,4 @@ npx prisma db seed   # Seed with demo data (Clinic@123 for all users)
 
 ---
 
-_Last updated: 2026-07-20 — All Phase 1–4 work complete, ready for n8n integration._
+_Last updated: 2026-07-22 — All Phase 1–5 work complete. Next: Vercel env sync, n8n e2e test._
