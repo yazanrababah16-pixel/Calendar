@@ -56,6 +56,7 @@ export function WeekView({
     COMPLETED: "border-l-gray-500 bg-gray-50 dark:bg-gray-950/30",
     CANCELLED: "border-l-red-500 bg-red-50 dark:bg-red-950/30 opacity-60",
     NO_SHOW: "border-l-red-500 bg-red-50 dark:bg-red-950/30 opacity-60",
+    NEEDS_RESCHEDULE: "border-l-orange-400 bg-orange-50 dark:bg-orange-950/30",
   };
 
   function hexToRgba(hex: string, alpha: number) {

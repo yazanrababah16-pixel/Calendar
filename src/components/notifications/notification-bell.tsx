@@ -31,7 +31,7 @@ export function NotificationBell() {
       return result.count;
     },
     refetchInterval: 30000,
-    enabled: !!role && ["RECEPTIONIST", "PROVIDER"].includes(role),
+    enabled: !!role && ["RECEPTIONIST", "PROVIDER", "ADMIN"].includes(role),
   });
 
   const { data: notifications } = useQuery({
@@ -64,7 +64,7 @@ export function NotificationBell() {
     queryClient.invalidateQueries({ queryKey: ["unreadNotifications"] });
   }, [queryClient]);
 
-  if (!role || !["RECEPTIONIST", "PROVIDER"].includes(role)) return null;
+  if (!role || !["RECEPTIONIST", "PROVIDER", "ADMIN"].includes(role)) return null;
 
   const unreadCount = countData ?? 0;
 
@@ -111,6 +111,14 @@ export function NotificationBell() {
                     await handleMarkRead(n.id);
                     if (n.type === "leave_notification") {
                       router.push("/dashboard/calendar");
+                    } else if (n.type === "reschedule_request" && n.relatedEntityType) {
+                      const parts = n.relatedEntityType.split("|");
+                      const rescheduleDate = parts[0] ?? "";
+                      const rescheduleProviderId = parts[1] ?? "";
+                      const qs = new URLSearchParams();
+                      if (rescheduleDate) qs.set("date", rescheduleDate);
+                      if (rescheduleProviderId) qs.set("providerId", rescheduleProviderId);
+                      router.push(`/dashboard/receptionist/reschedule?${qs.toString()}`);
                     }
                     setOpen(false);
                   }}

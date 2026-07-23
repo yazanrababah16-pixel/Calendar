@@ -14,6 +14,7 @@ import {
   Clock,
   CalendarRange,
   DollarSign,
+  CalendarClock,
 } from "lucide-react";
 
 type NavItem = {
@@ -59,6 +60,12 @@ const navItems: NavItem[] = [
     href: "/dashboard/billing",
     icon: DollarSign,
     roles: ["ADMIN", "RECEPTIONIST"],
+  },
+  {
+    labelKey: "nav.reschedule",
+    href: "/dashboard/receptionist/reschedule",
+    icon: CalendarClock,
+    roles: ["RECEPTIONIST", "ADMIN"],
   },
   {
     labelKey: "nav.providers",

@@ -1,13 +1,14 @@
 "use client";
 
-import { format, addWeeks, subWeeks, addMonths, subMonths } from "date-fns";
+import { format, addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { CalendarViewType } from "./calendar-view";
 
 interface CalendarHeaderProps {
   currentDate: Date;
-  view: "week" | "month";
-  onViewChange: (view: "week" | "month") => void;
+  view: CalendarViewType;
+  onViewChange: (view: CalendarViewType) => void;
   onDateChange: (date: Date) => void;
 }
 
@@ -23,16 +24,22 @@ export function CalendarHeader({
         ? direction === "prev"
           ? subWeeks
           : addWeeks
-        : direction === "prev"
-          ? subMonths
-          : addMonths;
+        : view === "day"
+          ? direction === "prev"
+            ? subDays
+            : addDays
+          : direction === "prev"
+            ? subMonths
+            : addMonths;
     onDateChange(fn(currentDate, 1));
   }
 
   const label =
     view === "week"
       ? `Week of ${format(currentDate, "MMM d, yyyy")}`
-      : format(currentDate, "MMMM yyyy");
+      : view === "day"
+        ? format(currentDate, "EEEE, MMM d, yyyy")
+        : format(currentDate, "MMMM yyyy");
 
   return (
     <div className="flex items-center justify-between">
@@ -59,6 +66,13 @@ export function CalendarHeader({
           onClick={() => onViewChange("month")}
         >
           Month
+        </Button>
+        <Button
+          variant={view === "day" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => onViewChange("day")}
+        >
+          Day
         </Button>
       </div>
     </div>

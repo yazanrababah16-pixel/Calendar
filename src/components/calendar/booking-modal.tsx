@@ -118,6 +118,7 @@ const statusColors: Record<string, string> = {
   COMPLETED: "text-gray-600 bg-gray-100",
   CANCELLED: "text-red-600 bg-red-50",
   NO_SHOW: "text-red-600 bg-red-50",
+  NEEDS_RESCHEDULE: "text-orange-600 bg-orange-50",
 };
 
 export function BookingModal({

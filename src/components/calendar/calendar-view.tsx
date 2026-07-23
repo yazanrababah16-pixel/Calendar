@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { CalendarHeader } from "./calendar-header";
 import { WeekView } from "./week-view";
 import { MonthView } from "./month-view";
+import { DayView } from "./day-view";
 
 interface Appointment {
   id: string;
@@ -16,21 +17,31 @@ interface Appointment {
   provider: { user: { name: string; email: string } };
 }
 
+export type CalendarViewType = "week" | "month" | "day";
+
 interface CalendarViewProps {
   appointments: Appointment[];
   onSlotClick?: (start: Date) => void;
   onAppointmentClick?: (id: string) => void;
+  defaultView?: CalendarViewType;
+  defaultDate?: Date;
 }
 
-export function CalendarView({ appointments, onSlotClick, onAppointmentClick }: CalendarViewProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"week" | "month">("week");
+export function CalendarView({
+  appointments,
+  onSlotClick,
+  onAppointmentClick,
+  defaultView = "month",
+  defaultDate,
+}: CalendarViewProps) {
+  const [currentDate, setCurrentDate] = useState(defaultDate ?? new Date());
+  const [view, setView] = useState<CalendarViewType>(defaultView);
 
   const handleDateChange = useCallback((date: Date) => {
     setCurrentDate(date);
   }, []);
 
-  const handleViewChange = useCallback((v: "week" | "month") => {
+  const handleViewChange = useCallback((v: CalendarViewType) => {
     setView(v);
   }, []);
 
@@ -42,21 +53,30 @@ export function CalendarView({ appointments, onSlotClick, onAppointmentClick }: 
         onViewChange={handleViewChange}
         onDateChange={handleDateChange}
       />
-      {view === "week" ? (
+      {view === "week" && (
         <WeekView
           currentDate={currentDate}
           appointments={appointments}
           onSlotClick={onSlotClick}
           onAppointmentClick={onAppointmentClick}
         />
-      ) : (
+      )}
+      {view === "month" && (
         <MonthView
           currentDate={currentDate}
           appointments={appointments}
           onDayClick={(day) => {
             setCurrentDate(day);
-            setView("week");
+            setView("day");
           }}
+          onAppointmentClick={onAppointmentClick}
+        />
+      )}
+      {view === "day" && (
+        <DayView
+          currentDate={currentDate}
+          appointments={appointments}
+          onSlotClick={onSlotClick}
           onAppointmentClick={onAppointmentClick}
         />
       )}
