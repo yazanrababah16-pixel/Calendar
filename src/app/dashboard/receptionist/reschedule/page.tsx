@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -128,6 +128,21 @@ function MiniCalendar({
 }
 
 export default function ReschedulePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-96" />
+          <Skeleton className="h-[600px] w-full" />
+        </div>
+      }
+    >
+      <ReschedulePageContent />
+    </Suspense>
+  );
+}
+
+function ReschedulePageContent() {
   const { data: session } = useSession();
   const role = session?.user?.role;
   const searchParams = useSearchParams();
