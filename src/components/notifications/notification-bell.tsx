@@ -119,6 +119,8 @@ export function NotificationBell() {
                       if (rescheduleDate) qs.set("date", rescheduleDate);
                       if (rescheduleProviderId) qs.set("providerId", rescheduleProviderId);
                       router.push(`/dashboard/receptionist/reschedule?${qs.toString()}`);
+                    } else if (n.type === "booking_request") {
+                      router.push("/dashboard/receptionist/requests");
                     }
                     setOpen(false);
                   }}

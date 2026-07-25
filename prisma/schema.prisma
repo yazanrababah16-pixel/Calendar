@@ -55,6 +55,13 @@ enum PaymentMethod {
   INSURANCE
 }
 
+enum BookingRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -92,6 +99,7 @@ model Patient {
   invoices        Invoice[]
   medicalRecords  MedicalRecord[]
   patientProviders PatientProvider[]
+  bookingRequests BookingRequest[]
 
   @@map("patients")
 }
@@ -115,6 +123,7 @@ model Provider {
   workingHours      WorkingHours[]
   leaveRequests     LeaveRequest[]
   providerAssignments ProviderAssignment[] @relation("ProviderAssignments")
+  bookingRequests   BookingRequest[]
 
   @@map("providers")
 }
@@ -225,6 +234,7 @@ model Appointment {
   invoice       Invoice?
   medicalRecord MedicalRecord?
   workflowEvents WorkflowEvent[]
+  bookingRequest BookingRequest?
 
   @@index([patientId])
   @@index([providerId])
@@ -327,4 +337,34 @@ model WorkflowEvent {
   @@index([workflowType])
   @@index([appointmentId])
   @@map("workflow_events")
+}
+
+model BookingRequest {
+  id              String                @id @default(uuid())
+  patientPhone    String
+  patientName     String?
+  requestedDate   DateTime              @db.Timestamptz()
+  requestedTime   String
+  durationMinutes Int                   @default(30)
+  message         String?
+  status          BookingRequestStatus  @default(PENDING)
+  rejectionReason String?
+  modifiedStart   DateTime?             @db.Timestamptz()
+  modifiedEnd     DateTime?             @db.Timestamptz()
+  createdAt       DateTime              @default(now()) @db.Timestamptz()
+  updatedAt       DateTime              @default(now()) @updatedAt @db.Timestamptz()
+
+  providerId    String       @map("provider_id")
+  provider      Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  patientId     String?      @map("patient_id")
+  patient       Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  appointmentId String?      @unique @map("appointment_id")
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([providerId])
+  @@index([patientPhone])
+  @@map("booking_requests")
 }
