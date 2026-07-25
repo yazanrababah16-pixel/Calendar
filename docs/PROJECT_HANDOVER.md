@@ -92,18 +92,43 @@ A full-stack clinic management application built with:
 
 ### Phase 7: Two-Way WhatsApp Booking Request Workflow
 
-- **Schema — `BookingRequest` Model**: New model with `BookingRequestStatus` enum (PENDING, APPROVED, REJECTED, CANCELLED). Fields: patientPhone, patientName, requestedDate, requestedTime, durationMinutes, message, status, rejectionReason, modifiedStart/End. Relations to Provider, Patient (nullable), Appointment (nullable). 9 enums total.
+- **Schema — `BookingRequest` Model**: New model with `BookingRequestStatus` enum (PENDING, APPROVED, REJECTED, CANCELLED, AWAITING_PATIENT_REPLY). Fields: patientPhone, patientName, requestedDate, requestedTime, durationMinutes, message, status, rejectionReason, modifiedStart/End. Relations to Provider, Patient (nullable), Appointment (nullable). 9 enums total.
 - **Inbound Webhook**: `POST /api/webhooks/n8n/requests` — receives parsed WhatsApp messages from n8n, creates BookingRequest, looks up patient by phone, creates Notification for RECEPTIONIST + ADMIN, logs WorkflowEvent for idempotency.
-- **Server Actions**: `getBookingRequests(status)`, `approveBookingRequest(id)` (creates Appointment, triggers outbound confirmation), `rejectBookingRequest(id, reason)` (triggers outbound rejection), `modifyBookingRequest(id, newStart, newEnd)` (stores modified times, triggers outbound modification).
-- **Receptionist UI**: Two-panel layout at `/dashboard/receptionist/requests`. Left panel: queue of PENDING requests with phone, date/time, provider. Right panel: request details + Approve/Reject/Modify actions. Modify shows smart slot suggestions (reuses `getSuggestedSlots`).
+- **Server Actions**: `getBookingRequests(status)`, `approveBookingRequest(id)` (overlap check, creates Appointment, triggers outbound confirmation), `rejectBookingRequest(id, reason)` (triggers outbound rejection), `modifyBookingRequest(id, newStart, newEnd)` (overlap check, sets AWAITING_PATIENT_REPLY, triggers outbound modification).
+- **Receptionist UI**: Two-panel layout at `/dashboard/receptionist/requests`. Left panel: queue of PENDING requests with phone, date/time, provider, "Modified" badge. Right panel: request details + Approve/Reject/Modify actions. Modify shows smart slot suggestions (reuses `getSuggestedSlots`). Error toasts on all failures.
 - **Notification Deep-Linking**: `booking_request` notifications route to `/dashboard/receptionist/requests`.
 - **Sidebar Navigation**: Added "Requests" nav item for RECEPTIONIST + ADMIN with `MessageSquare` icon. i18n: EN "Requests", AR "طلبات الحجز".
 - **n8n Workflows**: Updated `WhatsApp Booking Agent.json` (inbound: Meta Webhook → Parse → Forward to Next.js API → Send acknowledgement). Created 3 outbound workflows: `WhatsApp Booking Confirmed.json`, `WhatsApp Booking Rejected.json`, `WhatsApp Booking Modified.json` (Webhook → Format message → Send via Meta WhatsApp API).
 - **Execution Plan**: Full plan documented in `docs/WHATSAPP_BOOKING_PLAN.md` with checkboxes mapped to rule files.
 
+### Phase 8: Mock Testing Environment
+
+- **MOCK_WEBHOOK_MODE**: Added `MOCK_WEBHOOK_MODE=true` env var support — bypasses HMAC verification on inbound webhook and enables test API routes at `/api/test/*`.
+- **CLI Test Script**: `scripts/test-booking.js` — supports `--phone`, `--date`, `--time`, `--approve <id>`, `--reject <id> --reason`, `--modify <id> --new-start --new-end`, `--list` flags. Sends requests directly to Next.js API, bypassing n8n.
+- **Test API Routes**: `/api/test/approve-booking`, `/api/test/reject-booking`, `/api/test/list-bookings` — no auth required, mock mode only.
+- **Documentation**: `docs/MOCK_TESTING_GUIDE.md` with full testing workflow.
+
+### Phase 9: Bug Fixes & Polish
+
+- **Overlap Detection**: Both `approveBookingRequest` and `modifyBookingRequest` now query existing non-cancelled appointments for the same provider+time window before creating/modifying. Returns 409 error if overlap found.
+- **Zod Datetime Fix**: Changed `z.string().datetime()` to `z.coerce.date()` in `modifySchema` for graceful parsing of ISO strings without timezone.
+- **Suggested Slots Fix**: `getSuggestedSlots` now returns `slotStartDT.toISOString()` / `slotEndDT.toISOString()` (proper ISO 8601 with timezone) instead of bare datetime strings.
+- **Cache Invalidation**: Added `revalidatePath("/dashboard/receptionist/requests")` to all three server actions (approve, reject, modify).
+- **Client Error Handling**: Added `catch` blocks to all three action handlers for proper toast error display on network/exceptions.
+- **Patient Auto-Creation**: `approveBookingRequest` auto-creates Patient+User records by phone number when no linked patient exists.
+
+### Phase 10: n8n AI Agent Workflow
+
+- **AI System Rules**: Created `C:\Users\yazan\OneDrive\Desktop\n8nflow\AI_SYSTEM_RULES.md` — System prompt for AI Agent (no medical advice, strict tone, conversation flow rules, tool usage rules, privacy compliance).
+- **AI Workflow JSON**: Created `C:\Users\yazan\OneDrive\Desktop\n8nflow\WhatsApp AI Booking Agent.json` — Full n8n workflow with: Webhook Trigger, Parse Message, AI Agent (Conversational Agent), Window Buffer Memory, Check Availability Tool (HTTP Request → `/api/availability/slots`), Submit Booking Tool (HTTP Request → `/api/webhooks/n8n/requests`).
+- **Availability API**: Created `/api/availability/slots` route — Public endpoint for n8n AI Agent to query available appointment slots (no auth required). Scans working hours, existing appointments, leave requests over 7 days.
+
 ### Git History (key commits)
 
 ```
+d074475 feat: public availability slots API endpoint for n8n AI agent
+520e4d8 fix: AWAITING_PATIENT_REPLY status, error toasts, queue cleanup for booking requests
+a505604 fix: overlap checks, datetime validation, revalidatePath, UI polish for booking requests
 2f1b956 feat: implement two-way WhatsApp booking request workflow with n8n integration
 82905c8 fix: wrap useSearchParams in Suspense boundary to fix Vercel build
 089c2aa feat: implement smart rescheduling workflow with two-panel UI and smart suggestions
@@ -124,13 +149,14 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 ## 3. Current State & Pending Work
 
-### State: All Phase 1–6 features are implemented, build-passing, seeded, and pushed to `main`.
+### State: All Phase 1–10 features are implemented, build-passing, seeded, and pushed to `main`.
 
 ### Next Immediate Tasks (resume here)
 
 1. **Update Vercel Environment Variables**: Deploy the database fix by updating `DATABASE_URL` and `DIRECT_DATABASE_URL` in the Vercel dashboard with the new Neon password. Currently only `.env` (local) has the updated password.
-2. **End-to-End n8n WhatsApp Bot Test**: Import the corrected `WhatsApp Booking Agent.json` into n8n, create the Postgres credential with SSL enabled, assign it to both PostgresTool nodes, activate the workflow, and verify a full booking flow end-to-end.
-3. **Wire system webhook events**: Connect appointment creation/reminder events in the app to the n8n webhook endpoint (`POST /api/webhooks/n8n`) for automated WhatsApp notifications.
+2. **Import n8n AI Agent Workflow**: Import `C:\Users\yazan\OneDrive\Desktop\n8nflow\WhatsApp AI Booking Agent.json` into n8n. Set `NEXTJS_URL` env var in n8n to your Next.js app URL. Copy `AI_SYSTEM_RULES.md` contents into `AI_SYSTEM_PROMPT` env var.
+3. **End-to-End WhatsApp Bot Test**: Activate the n8n AI workflow, send a WhatsApp message to the bot, verify the full conversational booking flow (greeting → collect details → check availability → submit booking → confirmation).
+4. **Wire system webhook events**: Connect appointment creation/reminder events in the app to the n8n webhook endpoint (`POST /api/webhooks/n8n`) for automated WhatsApp notifications.
 
 ### Other Known Items
 
@@ -144,10 +170,10 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 | File                                                 | Purpose                                                     |
 | ---------------------------------------------------- | ----------------------------------------------------------- |
-| `prisma/schema.prisma`                               | Full database schema (14 models, 9 enums)                   |
+| `prisma/schema.prisma`                               | Full database schema (14 models, 10 enums)                  |
 | `prisma/seed.ts`                                     | Production seed script                                      |
 | `src/server/actions/appointments.ts`                 | Appointment CRUD + rescheduling workflow                    |
-| `src/server/actions/booking-requests.ts`             | WhatsApp booking request CRUD + n8n triggers                |
+| `src/server/actions/booking-requests.ts`             | WhatsApp booking request CRUD + overlap checks + n8n triggers |
 | `src/server/actions/clinical.ts`                     | Medical record CRUD                                         |
 | `src/server/actions/analytics.ts`                    | Admin analytics aggregation                                 |
 | `src/server/actions/billing.ts`                      | Invoice + payment actions                                   |
@@ -168,8 +194,17 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 | `src/app/dashboard/receptionist/requests/page.tsx`   | WhatsApp booking requests dashboard (two-panel)             |
 | `src/app/api/webhooks/n8n/requests/route.ts`         | Inbound webhook for WhatsApp booking requests               |
 | `src/app/api/webhooks/n8n/route.ts`                  | n8n webhook endpoint                                        |
+| `src/app/api/availability/slots/route.ts`            | Public availability slots API for n8n AI Agent              |
+| `src/app/api/test/approve-booking/route.ts`          | Test-only approve endpoint (mock mode)                      |
+| `src/app/api/test/reject-booking/route.ts`           | Test-only reject endpoint (mock mode)                       |
+| `src/app/api/test/list-bookings/route.ts`            | Test-only list endpoint (mock mode)                         |
+| `scripts/test-booking.js`                            | CLI test tool for WhatsApp booking flow                     |
 | `docs/PROJECT_HANDOVER.md`                           | This file — project context handover                        |
 | `docs/WHATSAPP_BOOKING_PLAN.md`                      | WhatsApp booking workflow execution plan                    |
+| `docs/ARCHITECTURE.md`                               | System architecture, ERD, flow diagrams                     |
+| `docs/MOCK_TESTING_GUIDE.md`                         | Mock testing workflow documentation                         |
+| `C:\...\n8nflow\AI_SYSTEM_RULES.md`                  | AI Agent system prompt for n8n                              |
+| `C:\...\n8nflow\WhatsApp AI Booking Agent.json`      | n8n AI Agent workflow JSON (import into n8n)                |
 
 ---
 
@@ -195,4 +230,4 @@ npx prisma db seed   # Seed with demo data (Clinic@123 for all users)
 
 ---
 
-_Last updated: 2026-07-26 — All Phase 1–7 work complete. Next: Vercel env sync, n8n e2e test._
+_Last updated: 2026-07-26 — All Phase 1–10 work complete including AI Agent workflow. Next: Vercel env sync, n8n import, e2e test._

@@ -32,6 +32,83 @@ flowchart TB
     K --> H
 ```
 
+## WhatsApp AI Agent Flow
+
+```mermaid
+flowchart TB
+    subgraph WhatsApp [WhatsApp User]
+        A[Patient sends message]
+    end
+
+    subgraph n8n [n8n AI Agent]
+        B[Webhook Trigger] --> C[Parse Message]
+        C --> D[AI Agent<br/>Conversational Agent]
+        D --> E{Intent?}
+        E -->|New Booking| F[Collect: name, phone,<br/>date, time, provider]
+        E -->|Reschedule| G[Collect: ref + new time]
+        E -->|Cancel| H[Collect: ref + confirm]
+        E -->|Medical Question| I[Deflect to clinic]
+        F --> J[Check Availability Tool<br/>GET /api/availability/slots]
+        J --> K[Present available slots]
+        K --> L{Patient confirms?}
+        L -->|Yes| M[Submit Booking Tool<br/>POST /api/webhooks/n8n/requests]
+        L -->|No| K
+        M --> N[Return confirmation]
+    end
+
+    subgraph NextJS [Next.js API]
+        O[/api/availability/slots<br/>— Public, no auth]
+        P[/api/webhooks/n8n/requests<br/>— HMAC verified]
+        Q[BookingRequest → PENDING]
+        R[Notification → Receptionist]
+    end
+
+    subgraph Receptionist [Receptionist UI]
+        S[Pending Queue] --> T{Action}
+        T -->|Approve| U[Overlap check → Create Appointment]
+        T -->|Reject| V[Set REJECTED → Notify patient]
+        T -->|Modify| W[Overlap check → Set AWAITING_PATIENT_REPLY]
+    end
+
+    A --> B
+    J --> O
+    M --> P
+    P --> Q
+    Q --> R
+    R --> S
+    U --> X[APPROVED → WhatsApp confirmation]
+    V --> Y[REJECTED → WhatsApp rejection]
+    W --> Z[AWAITING_PATIENT_REPLY → WhatsApp modification]
+```
+
+## Booking Request State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Inbound webhook received
+
+    PENDING --> APPROVED: approveBookingRequest<br/>(overlap check ✓)
+    PENDING --> REJECTED: rejectBookingRequest
+    PENDING --> AWAITING_PATIENT_REPLY: modifyBookingRequest<br/>(overlap check ✓)
+
+    AWAITING_PATIENT_REPLY --> PENDING: Patient confirms new time
+    AWAITING_PATIENT_REPLY --> REJECTED: Patient declines
+
+    APPROVED --> [*]
+    REJECTED --> [*]
+```
+
+### Overlap Check Flow
+
+```mermaid
+flowchart TD
+    A[Approve/Modify Request] --> B[Calculate startTime, endTime]
+    B --> C[Query: SELECT FROM appointments<br/>WHERE providerId = X<br/>AND status NOT IN CANCELLED, NO_SHOW<br/>AND startTime < endTime<br/>AND endTime > startTime]
+    C --> D{Overlap found?}
+    D -->|Yes| E[Return error:<br/>"Time slot already booked"]
+    D -->|No| F[Proceed with<br/>create/update]
+```
+
 ## Role-Based Data Flow
 
 ### Receptionist Flow
@@ -159,13 +236,32 @@ erDiagram
         string title "nullable"
         string notes "nullable"
         string color "nullable"
-        enum status "SCHEDULED | CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED | NO_SHOW"
+        enum status "SCHEDULED | CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED | NO_SHOW | NEEDS_RESCHEDULE"
         datetime startTime
         datetime endTime
         datetime createdAt
         datetime updatedAt
         string patientId FK
         string providerId FK
+    }
+
+    BookingRequest {
+        string id PK
+        string patientPhone
+        string patientName "nullable"
+        datetime requestedDate
+        string requestedTime
+        int durationMinutes
+        string message "nullable"
+        enum status "PENDING | APPROVED | REJECTED | CANCELLED | AWAITING_PATIENT_REPLY"
+        string rejectionReason "nullable"
+        datetime modifiedStart "nullable"
+        datetime modifiedEnd "nullable"
+        datetime createdAt
+        datetime updatedAt
+        string providerId FK
+        string patientId FK "nullable"
+        string appointmentId FK "nullable, unique"
     }
 
     Availability {
@@ -246,7 +342,12 @@ erDiagram
 
     Appointment ||--o| Invoice : "billed as"
     Appointment ||--o{ WorkflowEvent : "triggers"
+    Appointment ||--o| BookingRequest : "created from"
     Invoice ||--o{ Payment : "has"
+
+    BookingRequest }o--|| Provider : "for"
+    BookingRequest }o--o| Patient : "from"
+    BookingRequest }o--o| Appointment : "links to"
 ```
 
 ## Calendar RBAC — Detailed Flow
@@ -346,3 +447,4 @@ sequenceDiagram
 | Settings          | ✓     | ✓               | ✓              | ✓       |
 | Notifications     | ✗     | ✓ receive       | ✓ send/receive | ✗       |
 | Billing           | ✓     | ✓               | ✓ own          | ✓ read  |
+| Booking Requests  | ✓     | ✓ approve/reject/modify | ✗       | ✗       |
