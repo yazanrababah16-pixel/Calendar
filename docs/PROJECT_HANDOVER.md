@@ -39,7 +39,7 @@ A full-stack clinic management application built with:
 ### Phase 1: Foundation
 
 - Stabilized Prisma/Neon connection with driver adapter
-- Schema finalized: **13 models** (User, Patient, Provider, PatientProvider, ProviderAssignment, WorkingHours, LeaveRequest, Notification, Appointment, Invoice, Payment, MedicalRecord, WorkflowEvent) and **8 enums** (Role, AppointmentStatus, WorkflowEventStatus, LeaveRequestStatus, NotificationStatus, InvoiceStatus, PaymentMethod)
+- Schema finalized: **14 models** (User, Patient, Provider, PatientProvider, ProviderAssignment, WorkingHours, LeaveRequest, Notification, Appointment, Invoice, Payment, MedicalRecord, WorkflowEvent, BookingRequest) and **9 enums** (Role, AppointmentStatus, WorkflowEventStatus, LeaveRequestStatus, NotificationStatus, InvoiceStatus, PaymentMethod, BookingRequestStatus)
 - Migration `add_emr_module` applied for MedicalRecord
 - Basic RBAC with RoleGuard component
 - User registration/login with bcrypt password hashing
@@ -90,9 +90,21 @@ A full-stack clinic management application built with:
 - **Sidebar Navigation**: Added "Reschedule" nav item for RECEPTIONIST + ADMIN roles with `CalendarClock` icon. i18n translations added (EN: "Reschedule", AR: "إعادة جدولة").
 - **Vercel Build Fix**: Wrapped `useSearchParams()` in `<Suspense>` boundaries on both calendar and reschedule pages to fix Next.js static generation bailout.
 
+### Phase 7: Two-Way WhatsApp Booking Request Workflow
+
+- **Schema — `BookingRequest` Model**: New model with `BookingRequestStatus` enum (PENDING, APPROVED, REJECTED, CANCELLED). Fields: patientPhone, patientName, requestedDate, requestedTime, durationMinutes, message, status, rejectionReason, modifiedStart/End. Relations to Provider, Patient (nullable), Appointment (nullable). 9 enums total.
+- **Inbound Webhook**: `POST /api/webhooks/n8n/requests` — receives parsed WhatsApp messages from n8n, creates BookingRequest, looks up patient by phone, creates Notification for RECEPTIONIST + ADMIN, logs WorkflowEvent for idempotency.
+- **Server Actions**: `getBookingRequests(status)`, `approveBookingRequest(id)` (creates Appointment, triggers outbound confirmation), `rejectBookingRequest(id, reason)` (triggers outbound rejection), `modifyBookingRequest(id, newStart, newEnd)` (stores modified times, triggers outbound modification).
+- **Receptionist UI**: Two-panel layout at `/dashboard/receptionist/requests`. Left panel: queue of PENDING requests with phone, date/time, provider. Right panel: request details + Approve/Reject/Modify actions. Modify shows smart slot suggestions (reuses `getSuggestedSlots`).
+- **Notification Deep-Linking**: `booking_request` notifications route to `/dashboard/receptionist/requests`.
+- **Sidebar Navigation**: Added "Requests" nav item for RECEPTIONIST + ADMIN with `MessageSquare` icon. i18n: EN "Requests", AR "طلبات الحجز".
+- **n8n Workflows**: Updated `WhatsApp Booking Agent.json` (inbound: Meta Webhook → Parse → Forward to Next.js API → Send acknowledgement). Created 3 outbound workflows: `WhatsApp Booking Confirmed.json`, `WhatsApp Booking Rejected.json`, `WhatsApp Booking Modified.json` (Webhook → Format message → Send via Meta WhatsApp API).
+- **Execution Plan**: Full plan documented in `docs/WHATSAPP_BOOKING_PLAN.md` with checkboxes mapped to rule files.
+
 ### Git History (key commits)
 
 ```
+2f1b956 feat: implement two-way WhatsApp booking request workflow with n8n integration
 82905c8 fix: wrap useSearchParams in Suspense boundary to fix Vercel build
 089c2aa feat: implement smart rescheduling workflow with two-panel UI and smart suggestions
 e2d7aa0 docs: log Neon db password expiration issue
@@ -132,9 +144,10 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 | File                                                 | Purpose                                                     |
 | ---------------------------------------------------- | ----------------------------------------------------------- |
-| `prisma/schema.prisma`                               | Full database schema (13 models, 8 enums)                   |
+| `prisma/schema.prisma`                               | Full database schema (14 models, 9 enums)                   |
 | `prisma/seed.ts`                                     | Production seed script                                      |
 | `src/server/actions/appointments.ts`                 | Appointment CRUD + rescheduling workflow                    |
+| `src/server/actions/booking-requests.ts`             | WhatsApp booking request CRUD + n8n triggers                |
 | `src/server/actions/clinical.ts`                     | Medical record CRUD                                         |
 | `src/server/actions/analytics.ts`                    | Admin analytics aggregation                                 |
 | `src/server/actions/billing.ts`                      | Invoice + payment actions                                   |
@@ -152,8 +165,11 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 | `src/components/ui/badge.tsx`                        | Badge component for status/duration tags                    |
 | `src/app/dashboard/calendar/page.tsx`                | Calendar page — role-based filtering + Request Rescheduling |
 | `src/app/dashboard/receptionist/reschedule/page.tsx` | Smart rescheduling dashboard (two-panel)                    |
+| `src/app/dashboard/receptionist/requests/page.tsx`   | WhatsApp booking requests dashboard (two-panel)             |
+| `src/app/api/webhooks/n8n/requests/route.ts`         | Inbound webhook for WhatsApp booking requests               |
 | `src/app/api/webhooks/n8n/route.ts`                  | n8n webhook endpoint                                        |
 | `docs/PROJECT_HANDOVER.md`                           | This file — project context handover                        |
+| `docs/WHATSAPP_BOOKING_PLAN.md`                      | WhatsApp booking workflow execution plan                    |
 
 ---
 
@@ -179,4 +195,4 @@ npx prisma db seed   # Seed with demo data (Clinic@123 for all users)
 
 ---
 
-_Last updated: 2026-07-25 — All Phase 1–6 work complete. Next: Vercel env sync, n8n e2e test._
+_Last updated: 2026-07-26 — All Phase 1–7 work complete. Next: Vercel env sync, n8n e2e test._
