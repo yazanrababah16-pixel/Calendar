@@ -60,6 +60,7 @@ enum BookingRequestStatus {
   APPROVED
   REJECTED
   CANCELLED
+  AWAITING_PATIENT_REPLY
 }
 
 model User {

@@ -47,7 +47,7 @@ export async function getBookingRequests(status?: string): Promise<
   if (!session?.user) return { success: false, error: "Unauthorized" };
 
   const where: Record<string, unknown> = {};
-  if (status && ["PENDING", "APPROVED", "REJECTED", "CANCELLED"].includes(status)) {
+  if (status && ["PENDING", "APPROVED", "REJECTED", "CANCELLED", "AWAITING_PATIENT_REPLY"].includes(status)) {
     where.status = status;
   } else {
     where.status = "PENDING";
@@ -270,6 +270,7 @@ export async function modifyBookingRequest(
   await db.bookingRequest.update({
     where: { id },
     data: {
+      status: "AWAITING_PATIENT_REPLY",
       modifiedStart: startDT,
       modifiedEnd: endDT,
     },

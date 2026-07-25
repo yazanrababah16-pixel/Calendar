@@ -118,6 +118,8 @@ function RequestsPageContent() {
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
+      } catch (e) {
+        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
       } finally {
         setActionLoading(null);
       }
@@ -143,6 +145,8 @@ function RequestsPageContent() {
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
+      } catch (e) {
+        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
       } finally {
         setActionLoading(null);
       }
@@ -167,6 +171,8 @@ function RequestsPageContent() {
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
+      } catch (e) {
+        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
       } finally {
         setActionLoading(null);
       }
