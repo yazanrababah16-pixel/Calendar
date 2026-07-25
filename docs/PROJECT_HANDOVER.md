@@ -39,7 +39,7 @@ A full-stack clinic management application built with:
 ### Phase 1: Foundation
 
 - Stabilized Prisma/Neon connection with driver adapter
-- Schema finalized: **13 models** (User, Patient, Provider, PatientProvider, ProviderAssignment, WorkingHours, LeaveRequest, Notification, Appointment, Invoice, Payment, MedicalRecord, WorkflowEvent) and **7 enums** (Role, AppointmentStatus, WorkflowEventStatus, LeaveRequestStatus, NotificationStatus, InvoiceStatus, PaymentMethod)
+- Schema finalized: **13 models** (User, Patient, Provider, PatientProvider, ProviderAssignment, WorkingHours, LeaveRequest, Notification, Appointment, Invoice, Payment, MedicalRecord, WorkflowEvent) and **8 enums** (Role, AppointmentStatus, WorkflowEventStatus, LeaveRequestStatus, NotificationStatus, InvoiceStatus, PaymentMethod)
 - Migration `add_emr_module` applied for MedicalRecord
 - Basic RBAC with RoleGuard component
 - User registration/login with bcrypt password hashing
@@ -76,9 +76,25 @@ A full-stack clinic management application built with:
 - **n8n Workflow SQL Fix**: Corrected the `WhatsApp Booking Agent` workflow JSON (`C:\Users\yazan\OneDrive\Desktop\n8nflow\WhatsApp Booking Agent.json`) to query the actual Prisma-mapped tables (`"appointments"`, `"patients"`, `"users"`) with proper quoted identifiers. The `book_appointment` INSERT now looks up `patient_id` via phone subquery and builds `startTime` from concatenated date+time. Both PostgresTool nodes are documented with SSL-required credential setup for Neon.
 - **Neon Password Expiry — Login Fix**: Diagnosed and resolved a silent NextAuth login failure ("Invalid email or password") caused by an expired Neon database password. The `authorize` function could not connect to the database, returning `null` — indistinguishable from a wrong password. Updated `DATABASE_URL` and `DIRECT_DATABASE_URL` in `.env` with a fresh password from the Neon Console. Documented in `docs/KNOWN_ISSUES.md`.
 
+### Phase 6: Calendar UX, Smart Rescheduling Workflow & Notification Deep-Linking
+
+- **Calendar Default View — Month**: Changed default calendar view from `"week"` to `"month"` across all dashboards. Added `"day"` as a third view option with full 14-hour grid (7am–8pm). `CalendarView` now accepts `defaultView` and `defaultDate` props for deep linking.
+- **Day View Component**: New `src/components/calendar/day-view.tsx` — hourly grid with appointment cards, click-to-book on empty slots, click-to-edit on appointments.
+- **Provider "Request Rescheduling" Feature**: Provider dashboard calendar page has a "Request Rescheduling" button. Dialog with date picker flags all active appointments for that date as `NEEDS_RESCHEDULE` instead of cancelling them. Creates `reschedule_request` notifications for RECEPTIONIST + ADMIN users.
+- **Schema — `NEEDS_RESCHEDULE` Enum Value**: Added to `AppointmentStatus` in Prisma schema. Database synced via `prisma db push --accept-data-loss`. Status color (orange) added to month-view, week-view, day-view, and booking-modal.
+- **Smart Rescheduling Dashboard**: New page at `/dashboard/receptionist/reschedule?date=YYYY-MM-DD&providerId=XYZ`. Two-panel split-screen layout:
+  - **Left Panel (Queue)**: Lists all `NEEDS_RESCHEDULE` appointments for the provider+date. Shows patient name, time, duration badge. Selected appointment highlighted.
+  - **Right Panel (Smart Rescheduler)**: Idle until appointment selected. Fetches dynamic availability for that provider and appointment duration. Shows up to 5 suggested slots as quick-action buttons. Mini monthly calendar below for manual date picking.
+- **Reschedule Server Actions**: `getRescheduleQueue`, `getSuggestedSlots` (scans working hours, existing appointments, leave requests over 14 days), `rescheduleAppointment` (validates overlap, moves slot, sets status back to `SCHEDULED`).
+- **Notification Deep-Linking**: Clicking a `reschedule_request` notification routes to `/dashboard/receptionist/reschedule?date=...&providerId=...`. Notification bell now also visible for ADMIN role.
+- **Sidebar Navigation**: Added "Reschedule" nav item for RECEPTIONIST + ADMIN roles with `CalendarClock` icon. i18n translations added (EN: "Reschedule", AR: "إعادة جدولة").
+- **Vercel Build Fix**: Wrapped `useSearchParams()` in `<Suspense>` boundaries on both calendar and reschedule pages to fix Next.js static generation bailout.
+
 ### Git History (key commits)
 
 ```
+82905c8 fix: wrap useSearchParams in Suspense boundary to fix Vercel build
+089c2aa feat: implement smart rescheduling workflow with two-panel UI and smart suggestions
 e2d7aa0 docs: log Neon db password expiration issue
 e418a4e feat: production seeding with 18 patients, 3 providers, appointments, invoices...
 313ac53 feat: analytics dashboard with recharts - revenue bar, status pie, provider workload
@@ -96,7 +112,7 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 ## 3. Current State & Pending Work
 
-### State: All Phase 1–5 features are implemented, build-passing, seeded, and pushed to `main`.
+### State: All Phase 1–6 features are implemented, build-passing, seeded, and pushed to `main`.
 
 ### Next Immediate Tasks (resume here)
 
@@ -114,18 +130,30 @@ e7a3d54 feat: patient self-service booking + RoleGuard component
 
 ## 4. Key Files Reference
 
-| File                                           | Purpose                                   |
-| ---------------------------------------------- | ----------------------------------------- |
-| `prisma/schema.prisma`                         | Full database schema (13 models, 7 enums) |
-| `prisma/seed.ts`                               | Production seed script                    |
-| `src/server/actions/clinical.ts`               | Medical record CRUD                       |
-| `src/server/actions/analytics.ts`              | Admin analytics aggregation               |
-| `src/server/actions/billing.ts`                | Invoice + payment actions                 |
-| `src/server/actions/notifications.ts`          | Notification read/unread                  |
-| `src/components/auth/role-guard.tsx`           | RBAC wrapper component                    |
-| `src/components/dashboard/admin-dashboard.tsx` | Admin charts dashboard                    |
-| `src/app/api/webhooks/n8n/route.ts`            | n8n webhook endpoint                      |
-| `docs/PHASE_4_FINAL_PLAN.md`                   | Original phase 4 plan with checkboxes     |
+| File                                                 | Purpose                                                     |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| `prisma/schema.prisma`                               | Full database schema (13 models, 8 enums)                   |
+| `prisma/seed.ts`                                     | Production seed script                                      |
+| `src/server/actions/appointments.ts`                 | Appointment CRUD + rescheduling workflow                    |
+| `src/server/actions/clinical.ts`                     | Medical record CRUD                                         |
+| `src/server/actions/analytics.ts`                    | Admin analytics aggregation                                 |
+| `src/server/actions/billing.ts`                      | Invoice + payment actions                                   |
+| `src/server/actions/notifications.ts`                | Notification read/unread                                    |
+| `src/server/actions/n8n.ts`                          | n8n workflow trigger helper                                 |
+| `src/components/auth/role-guard.tsx`                 | RBAC wrapper component                                      |
+| `src/components/dashboard/admin-dashboard.tsx`       | Admin charts dashboard                                      |
+| `src/components/dashboard/sidebar.tsx`               | Sidebar navigation with role-based items                    |
+| `src/components/calendar/calendar-view.tsx`          | Calendar root — month/week/day toggle                       |
+| `src/components/calendar/day-view.tsx`               | Day view — hourly grid with appointments                    |
+| `src/components/calendar/month-view.tsx`             | Month view with status dots                                 |
+| `src/components/calendar/week-view.tsx`              | Week view with time slots                                   |
+| `src/components/calendar/booking-modal.tsx`          | Appointment create/edit/cancel modal                        |
+| `src/components/notifications/notification-bell.tsx` | Notification dropdown with deep-linking                     |
+| `src/components/ui/badge.tsx`                        | Badge component for status/duration tags                    |
+| `src/app/dashboard/calendar/page.tsx`                | Calendar page — role-based filtering + Request Rescheduling |
+| `src/app/dashboard/receptionist/reschedule/page.tsx` | Smart rescheduling dashboard (two-panel)                    |
+| `src/app/api/webhooks/n8n/route.ts`                  | n8n webhook endpoint                                        |
+| `docs/PROJECT_HANDOVER.md`                           | This file — project context handover                        |
 
 ---
 
@@ -151,4 +179,4 @@ npx prisma db seed   # Seed with demo data (Clinic@123 for all users)
 
 ---
 
-_Last updated: 2026-07-22 — All Phase 1–5 work complete. Next: Vercel env sync, n8n e2e test._
+_Last updated: 2026-07-25 — All Phase 1–6 work complete. Next: Vercel env sync, n8n e2e test._
