@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -18,8 +19,8 @@ const rejectSchema = z.object({
 
 const modifySchema = z.object({
   id: z.string().uuid(),
-  newStart: z.string().datetime(),
-  newEnd: z.string().datetime(),
+  newStart: z.coerce.date(),
+  newEnd: z.coerce.date(),
 });
 
 export async function getBookingRequests(status?: string): Promise<
@@ -85,15 +86,64 @@ export async function approveBookingRequest(
   if (!request) return { success: false, error: "Booking request not found" };
   if (request.status !== "PENDING") return { success: false, error: "Request is not pending" };
 
+  let patientId = request.patientId;
+
+  if (!patientId) {
+    const existing = await db.patient.findFirst({
+      where: { phone: request.patientPhone },
+    });
+
+    if (existing) {
+      patientId = existing.id;
+    } else {
+      const slug = request.patientPhone.replace(/[^a-zA-Z0-9]/g, "");
+      const patient = await db.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: request.patientName || `Patient ${request.patientPhone}`,
+            email: `whatsapp-${slug}@clinic.local`,
+            passwordHash: "",
+            role: "PATIENT",
+          },
+        });
+        return tx.patient.create({
+          data: { userId: user.id, phone: request.patientPhone },
+        });
+      });
+      patientId = patient.id;
+    }
+
+    await db.bookingRequest.update({
+      where: { id },
+      data: { patientId },
+    });
+  }
+
   const startTime = request.modifiedStart ?? request.requestedDate;
   const endTime =
     request.modifiedEnd ??
     new Date(new Date(request.requestedDate).getTime() + request.durationMinutes * 60000);
 
+  const overlap = await db.appointment.findFirst({
+    where: {
+      providerId: request.providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+    },
+  });
+
+  if (overlap) {
+    return {
+      success: false,
+      error: "This time slot is already booked. Please suggest a new time.",
+    };
+  }
+
   const appointment = await db.appointment.create({
     data: {
       providerId: request.providerId,
-      patientId: request.patientId ?? "",
+      patientId,
       startTime,
       endTime,
       title: `WhatsApp booking — ${request.patientPhone}`,
@@ -127,6 +177,8 @@ export async function approveBookingRequest(
     providerName: request.provider.user.name,
     appointmentId: appointment.id,
   }).catch(() => {});
+
+  revalidatePath("/dashboard/receptionist/requests");
 
   return { success: true, data: { appointmentId: appointment.id } };
 }
@@ -167,6 +219,8 @@ export async function rejectBookingRequest(id: string, reason?: string): Promise
     reason: reason ?? "",
   }).catch(() => {});
 
+  revalidatePath("/dashboard/receptionist/requests");
+
   return { success: true };
 }
 
@@ -193,11 +247,24 @@ export async function modifyBookingRequest(
   if (!request) return { success: false, error: "Booking request not found" };
   if (request.status !== "PENDING") return { success: false, error: "Request is not pending" };
 
-  const startDT = new Date(newStart);
-  const endDT = new Date(newEnd);
+  const startDT = parsed.data.newStart;
+  const endDT = parsed.data.newEnd;
 
   if (startDT >= endDT) {
     return { success: false, error: "Start time must be before end time" };
+  }
+
+  const overlap = await db.appointment.findFirst({
+    where: {
+      providerId: request.providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      startTime: { lt: endDT },
+      endTime: { gt: startDT },
+    },
+  });
+
+  if (overlap) {
+    return { success: false, error: "That time slot is already booked. Please choose another." };
   }
 
   await db.bookingRequest.update({
@@ -232,6 +299,8 @@ export async function modifyBookingRequest(
     newTime: newTimeStr,
     providerName: request.provider.user.name,
   }).catch(() => {});
+
+  revalidatePath("/dashboard/receptionist/requests");
 
   return { success: true };
 }

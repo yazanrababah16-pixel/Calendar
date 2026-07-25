@@ -260,8 +260,15 @@ function RequestsPageContent() {
                         <div className="flex items-center gap-1.5 mb-1">
                           <Calendar className="size-3 text-muted-foreground" />
                           <span className="text-sm font-medium">
-                            {format(new Date(req.requestedDate), "MMM d")} at {req.requestedTime}
+                            {req.modifiedStart
+                              ? format(new Date(req.modifiedStart), "MMM d, HH:mm")
+                              : `${format(new Date(req.requestedDate), "MMM d")} at ${req.requestedTime}`}
                           </span>
+                          {req.modifiedStart && (
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0">
+                              Modified
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <User className="size-3 text-muted-foreground" />
@@ -338,6 +345,30 @@ function RequestsPageContent() {
                         <p className="text-xs text-muted-foreground">Requested Time</p>
                         <p className="font-medium">{selectedRequest.requestedTime}</p>
                       </div>
+                      {selectedRequest.modifiedStart && (
+                        <>
+                          <div className="col-span-2 border-t pt-2">
+                            <p className="text-xs text-amber-600 font-medium mb-1">
+                              Suggested New Time
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">New Date</p>
+                            <p className="font-medium">
+                              {format(new Date(selectedRequest.modifiedStart), "EEEE, MMM d, yyyy")}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">New Time</p>
+                            <p className="font-medium">
+                              {format(new Date(selectedRequest.modifiedStart), "HH:mm")} –{" "}
+                              {selectedRequest.modifiedEnd
+                                ? format(new Date(selectedRequest.modifiedEnd), "HH:mm")
+                                : "—"}
+                            </p>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <p className="text-xs text-muted-foreground">Provider</p>
                         <p className="font-medium">{selectedRequest.provider.user.name}</p>

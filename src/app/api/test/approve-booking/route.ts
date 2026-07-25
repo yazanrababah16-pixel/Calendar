@@ -33,15 +33,64 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let patientId = request.patientId;
+
+  if (!patientId) {
+    const existing = await db.patient.findFirst({
+      where: { phone: request.patientPhone },
+    });
+
+    if (existing) {
+      patientId = existing.id;
+    } else {
+      const slug = request.patientPhone.replace(/[^a-zA-Z0-9]/g, "");
+      const patient = await db.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: request.patientName || `Patient ${request.patientPhone}`,
+            email: `whatsapp-${slug}@clinic.local`,
+            passwordHash: "",
+            role: "PATIENT",
+          },
+        });
+        return tx.patient.create({
+          data: { userId: user.id, phone: request.patientPhone },
+        });
+      });
+      patientId = patient.id;
+    }
+
+    await db.bookingRequest.update({
+      where: { id },
+      data: { patientId },
+    });
+  }
+
   const startTime = request.modifiedStart ?? request.requestedDate;
   const endTime =
     request.modifiedEnd ??
     new Date(new Date(request.requestedDate).getTime() + request.durationMinutes * 60000);
 
+  const overlap = await db.appointment.findFirst({
+    where: {
+      providerId: request.providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+    },
+  });
+
+  if (overlap) {
+    return NextResponse.json(
+      { error: "This time slot is already booked. Please suggest a new time." },
+      { status: 409 },
+    );
+  }
+
   const appointment = await db.appointment.create({
     data: {
       providerId: request.providerId,
-      patientId: request.patientId ?? "",
+      patientId,
       startTime,
       endTime,
       title: `WhatsApp booking — ${request.patientPhone}`,

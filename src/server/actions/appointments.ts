@@ -387,8 +387,8 @@ export async function getSuggestedSlots(
             day: "numeric",
           });
           slots.push({
-            start: `${dateKey}T${slotStartStr}:00`,
-            end: `${dateKey}T${slotEndStr}:00`,
+            start: slotStartDT.toISOString(),
+            end: slotEndDT.toISOString(),
             dayLabel: `${dayLabel}, ${slotStartStr} - ${slotEndStr}`,
           });
         }
