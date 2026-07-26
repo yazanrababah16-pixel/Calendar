@@ -217,7 +217,11 @@ function CalendarPageContent() {
       <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-semibold">Calendar</h1>
-          <p className="mt-1 text-sm text-muted-foreground">View and manage appointments</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {role === "PATIENT"
+              ? "View your appointments and booking requests"
+              : "View and manage appointments"}
+          </p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-12">
@@ -281,7 +285,7 @@ function CalendarPageContent() {
       )}
       {role === "PATIENT" && linkedProviders && linkedProviders.length > 0 && (
         <div className="text-sm text-muted-foreground">
-          Showing appointments for your linked doctors
+          Showing your appointments and pending booking requests
         </div>
       )}
       {role === "PATIENT" && linkedProviders?.length === 0 && (

@@ -16,6 +16,7 @@ import {
   updateAppointment,
   deleteAppointment,
 } from "@/server/actions/appointments";
+import { requestBooking } from "@/server/actions/booking-requests";
 
 import {
   Dialog,
@@ -251,17 +252,30 @@ export function BookingModal({
 
       formData.set("color", data.color || "#3b82f6");
 
-      const result = appointment
-        ? await updateAppointment(null, formData)
-        : await bookAppointment(null, formData);
+      const isPatientNewBooking = role === "PATIENT" && !appointment;
+      const result = isPatientNewBooking
+        ? await requestBooking(null, formData)
+        : appointment
+          ? await updateAppointment(null, formData)
+          : await bookAppointment(null, formData);
 
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ["appointments"] });
+        if (isPatientNewBooking) {
+          queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
+        }
         setError(null);
         setEditMode("none");
         onOpenChange(false);
         toast({
-          title: appointment ? "Appointment updated" : "Appointment booked",
+          title: isPatientNewBooking
+            ? "Booking request submitted"
+            : appointment
+              ? "Appointment updated"
+              : "Appointment booked",
+          description: isPatientNewBooking
+            ? "Your request is pending approval from our receptionist."
+            : undefined,
           type: "success",
         });
       } else {
@@ -273,7 +287,7 @@ export function BookingModal({
         });
       }
     },
-    [appointment, queryClient, onOpenChange, toast],
+    [appointment, queryClient, onOpenChange, toast, role],
   );
 
   const handleCancel = useCallback(async () => {
@@ -370,12 +384,18 @@ export function BookingModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? `Appointment #${appointment.id.slice(0, 8)}` : "Book Appointment"}
+            {isEdit
+              ? `Appointment #${appointment.id.slice(0, 8)}`
+              : role === "PATIENT"
+                ? "Request Appointment"
+                : "Book Appointment"}
           </DialogTitle>
           <DialogDescription>
             {isEdit
               ? `Status: ${statusLabels[appointment.status] ?? appointment.status}`
-              : "Fill in the details to create a new appointment."}
+              : role === "PATIENT"
+                ? "Select a provider and time to request an appointment."
+                : "Fill in the details to create a new appointment."}
           </DialogDescription>
           {isEdit && (
             <span
@@ -683,25 +703,27 @@ export function BookingModal({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Appointment Color</Label>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    title={c.label}
-                    onClick={() => setValue("color", c.value)}
-                    className={`size-7 rounded-full border-2 transition-all hover:scale-110 ${
-                      watchedColor === c.value
-                        ? "border-foreground scale-110"
-                        : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: c.value }}
-                  />
-                ))}
+            {role !== "PATIENT" && (
+              <div className="space-y-2">
+                <Label>Appointment Color</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      title={c.label}
+                      onClick={() => setValue("color", c.value)}
+                      className={`size-7 rounded-full border-2 transition-all hover:scale-110 ${
+                        watchedColor === c.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent"
+                      }`}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="button" variant="outline" onClick={isEdit ? handleBack : handleClose}>
@@ -718,7 +740,13 @@ export function BookingModal({
                 </Button>
               )}
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Book Appointment"}
+                {isSubmitting
+                  ? "Saving..."
+                  : isEdit
+                    ? "Save Changes"
+                    : role === "PATIENT"
+                      ? "Submit Request"
+                      : "Book Appointment"}
               </Button>
             </div>
           </form>

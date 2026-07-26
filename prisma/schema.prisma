@@ -346,6 +346,7 @@ model BookingRequest {
   patientPhone    String
   patientName     String?
   patientEmail    String?
+  source          String                @default("WHATSAPP")
   requestedDate   DateTime              @db.Timestamptz()
   requestedTime   String
   durationMinutes Int                   @default(30)

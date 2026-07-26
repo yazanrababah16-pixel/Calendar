@@ -58,6 +58,15 @@ export async function getBookingRequests(status?: string): Promise<
     where.status = "PENDING";
   }
 
+  if (session.user.role === "PATIENT") {
+    const patient = await db.patient.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    if (!patient) return { success: false, error: "Patient profile not found" };
+    where.patientId = patient.id;
+  }
+
   const requests = await db.bookingRequest.findMany({
     where,
     include: {
@@ -328,10 +337,21 @@ export async function getTentativeBookings(): Promise<ActionResult<TentativeBook
   const session = await auth();
   if (!session?.user) return { success: false, error: "Unauthorized" };
 
+  const where: Record<string, unknown> = {
+    status: { in: ["PENDING", "AWAITING_PATIENT_REPLY"] },
+  };
+
+  if (session.user.role === "PATIENT") {
+    const patient = await db.patient.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    if (!patient) return { success: false, error: "Patient profile not found" };
+    where.patientId = patient.id;
+  }
+
   const requests = await db.bookingRequest.findMany({
-    where: {
-      status: { in: ["PENDING", "AWAITING_PATIENT_REPLY"] },
-    },
+    where,
     include: {
       provider: { include: { user: { select: { name: true } } } },
     },
@@ -357,4 +377,77 @@ export async function getTentativeBookings(): Promise<ActionResult<TentativeBook
   });
 
   return { success: true, data: bookings };
+}
+
+const requestBookingSchema = z.object({
+  providerId: z.string().uuid(),
+  startTime: z.coerce.date(),
+  endTime: z.coerce.date(),
+  notes: z.string().max(2000).optional(),
+});
+
+export async function requestBooking(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "PATIENT") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const patient = await db.patient.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, phone: true, user: { select: { name: true, email: true } } },
+  });
+  if (!patient) return { success: false, error: "Patient profile not found" };
+
+  const parsed = requestBookingSchema.safeParse({
+    providerId: formData.get("providerId"),
+    startTime: formData.get("startTime"),
+    endTime: formData.get("endTime"),
+    notes: formData.get("notes") || undefined,
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues?.[0];
+    return { success: false, error: issue?.message ?? "Invalid input" };
+  }
+
+  const { providerId, startTime, endTime, notes } = parsed.data;
+  const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+
+  const bookingRequest = await db.bookingRequest.create({
+    data: {
+      patientPhone: patient.phone,
+      patientName: patient.user.name,
+      patientEmail: patient.user.email,
+      source: "WEB",
+      requestedDate: startTime,
+      requestedTime: `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`,
+      durationMinutes,
+      message: notes ?? null,
+      providerId,
+      patientId: patient.id,
+    },
+  });
+
+  const staff = await db.user.findMany({
+    where: { role: { in: ["RECEPTIONIST", "ADMIN"] } },
+    select: { id: true },
+  });
+
+  if (staff.length > 0) {
+    await db.notification.createMany({
+      data: staff.map((s) => ({
+        type: "booking_request",
+        message: `New web booking request from ${patient.user.name} for ${startTime.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${startTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}.`,
+        senderId: session.user.id,
+        receiverId: s.id,
+        relatedEntityId: bookingRequest.id,
+        relatedEntityType: "booking_request",
+      })),
+    });
+  }
+
+  return { success: true, data: { id: bookingRequest.id } };
 }

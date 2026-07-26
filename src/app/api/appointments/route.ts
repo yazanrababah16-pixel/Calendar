@@ -33,6 +33,17 @@ export async function GET(request: Request) {
     where.startTime = startFilter;
   }
 
+  if (session.user.role === "PATIENT") {
+    const patient = await db.patient.findUnique({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    if (!patient) {
+      return NextResponse.json({ error: "Patient profile not found" }, { status: 404 });
+    }
+    where.patientId = patient.id;
+  }
+
   const appointments = await db.appointment.findMany({
     where,
     include: {
