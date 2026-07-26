@@ -28,7 +28,11 @@ const addPatientSchema = z.object({
     .max(30)
     .optional()
     .or(z.literal("")),
-  phone: z.string().max(20).optional().or(z.literal("")),
+  phone: z
+    .string()
+    .min(5, "Phone number must be at least 5 characters")
+    .max(20, "Phone number must be at most 20 characters")
+    .regex(/^\+?[\d\-.\s()]+$/, "Phone number contains invalid characters"),
   dateOfBirth: z.string().optional().or(z.literal("")),
   notes: z.string().max(2000).optional().or(z.literal("")),
 });
@@ -68,7 +72,7 @@ export function AddPatientDialog({ open, onOpenChange, onPatientCreated }: AddPa
       formData.set("name", data.name);
       formData.set("email", data.email);
       if (data.username) formData.set("username", data.username);
-      if (data.phone) formData.set("phone", data.phone);
+      formData.set("phone", data.phone);
       if (data.dateOfBirth) formData.set("dateOfBirth", data.dateOfBirth);
       if (data.notes) formData.set("notes", data.notes);
 
@@ -176,8 +180,9 @@ export function AddPatientDialog({ open, onOpenChange, onPatientCreated }: AddPa
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone (optional)</Label>
+                <Label htmlFor="phone">Phone</Label>
                 <Input id="phone" {...register("phone")} placeholder="+1-555-0100" />
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
               </div>
 
               <div className="space-y-2">

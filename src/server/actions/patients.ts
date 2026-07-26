@@ -16,7 +16,11 @@ const createPatientSchema = z.object({
     .max(30)
     .optional()
     .or(z.literal("")),
-  phone: z.string().max(20).optional().or(z.literal("")),
+  phone: z
+    .string()
+    .min(5, "Phone number must be at least 5 characters")
+    .max(20, "Phone number must be at most 20 characters")
+    .regex(/^\+?[\d\-.\s()]+$/, "Phone number contains invalid characters"),
   dateOfBirth: z.string().optional().or(z.literal("")),
   notes: z.string().max(2000).optional().or(z.literal("")),
 });
@@ -36,7 +40,7 @@ export async function createPatient(
     name: formData.get("name"),
     email: formData.get("email"),
     username: formData.get("username") || undefined,
-    phone: formData.get("phone") || undefined,
+    phone: formData.get("phone"),
     dateOfBirth: formData.get("dateOfBirth") || undefined,
     notes: formData.get("notes") || undefined,
   });
@@ -60,6 +64,11 @@ export async function createPatient(
     }
   }
 
+  const existingPhone = await db.patient.findUnique({ where: { phone } });
+  if (existingPhone) {
+    return { success: false, error: "A patient with this phone number already exists" };
+  }
+
   const defaultPassword = "Clinic@123";
   const passwordHash = await bcrypt.hash(defaultPassword, 12);
 
@@ -77,7 +86,7 @@ export async function createPatient(
     return tx.patient.create({
       data: {
         userId: user.id,
-        phone: phone || null,
+        phone,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
         notes: notes || null,
       },

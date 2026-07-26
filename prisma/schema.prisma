@@ -88,7 +88,7 @@ model User {
 model Patient {
   id          String   @id @default(uuid())
   dateOfBirth DateTime? @db.Timestamptz()
-  phone       String?
+  phone       String   @unique
   notes       String?
   createdAt   DateTime @default(now()) @db.Timestamptz()
   updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz()
