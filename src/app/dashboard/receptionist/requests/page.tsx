@@ -29,6 +29,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toaster";
+import { CreatePatientModal } from "@/components/patients/create-patient-modal";
 
 type BookingRequestItem = {
   id: string;
@@ -45,6 +46,7 @@ type BookingRequestItem = {
   createdAt: Date;
   provider: { id: string; user: { name: string } };
   patient: { id: string; user: { name: string } } | null;
+  patientId: string | null;
 };
 
 export default function RequestsPage() {
@@ -73,6 +75,8 @@ function RequestsPageContent() {
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showModify, setShowModify] = useState(false);
+  const [showCreatePatient, setShowCreatePatient] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<BookingRequestItem | null>(null);
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ["bookingRequests"],
@@ -103,6 +107,12 @@ function RequestsPageContent() {
 
   const handleApprove = useCallback(
     async (req: BookingRequestItem) => {
+      if (!req.patientId) {
+        setPendingApproval(req);
+        setShowCreatePatient(true);
+        return;
+      }
+
       setActionLoading(req.id);
       try {
         const result = await approveBookingRequest(req.id);
@@ -119,12 +129,49 @@ function RequestsPageContent() {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
       } catch (e) {
-        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
+        toast({
+          title: "Error",
+          description: e instanceof Error ? e.message : "Something went wrong",
+          type: "error",
+        });
       } finally {
         setActionLoading(null);
       }
     },
     [queryClient, toast],
+  );
+
+  const handleCreatePatientSuccess = useCallback(
+    async (patientId: string) => {
+      if (!pendingApproval) return;
+
+      setActionLoading(pendingApproval.id);
+      try {
+        const result = await approveBookingRequest(pendingApproval.id, patientId);
+        if (result.success) {
+          toast({
+            title: "Patient created & request approved",
+            description: `Appointment created for ${pendingApproval.patientPhone}`,
+            type: "success",
+          });
+          setSelectedRequest(null);
+          queryClient.invalidateQueries({ queryKey: ["bookingRequests"] });
+          queryClient.invalidateQueries({ queryKey: ["appointments"] });
+        } else {
+          toast({ title: "Failed", description: result.error, type: "error" });
+        }
+      } catch (e) {
+        toast({
+          title: "Error",
+          description: e instanceof Error ? e.message : "Something went wrong",
+          type: "error",
+        });
+      } finally {
+        setActionLoading(null);
+        setPendingApproval(null);
+      }
+    },
+    [pendingApproval, queryClient, toast],
   );
 
   const handleReject = useCallback(
@@ -146,7 +193,11 @@ function RequestsPageContent() {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
       } catch (e) {
-        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
+        toast({
+          title: "Error",
+          description: e instanceof Error ? e.message : "Something went wrong",
+          type: "error",
+        });
       } finally {
         setActionLoading(null);
       }
@@ -172,7 +223,11 @@ function RequestsPageContent() {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
       } catch (e) {
-        toast({ title: "Error", description: e instanceof Error ? e.message : "Something went wrong", type: "error" });
+        toast({
+          title: "Error",
+          description: e instanceof Error ? e.message : "Something went wrong",
+          type: "error",
+        });
       } finally {
         setActionLoading(null);
       }
@@ -504,6 +559,14 @@ function RequestsPageContent() {
           </Card>
         </div>
       </div>
+
+      <CreatePatientModal
+        open={showCreatePatient}
+        onOpenChange={setShowCreatePatient}
+        prefillName={pendingApproval?.patientName ?? ""}
+        prefillPhone={pendingApproval?.patientPhone ?? ""}
+        onSuccess={handleCreatePatientSuccess}
+      />
     </div>
   );
 }

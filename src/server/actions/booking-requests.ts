@@ -10,6 +10,7 @@ type ActionResult<T = void> = { success: true; data?: T } | { success: false; er
 
 const approveSchema = z.object({
   id: z.string().uuid(),
+  patientId: z.string().uuid().optional(),
 });
 
 const rejectSchema = z.object({
@@ -40,6 +41,7 @@ export async function getBookingRequests(status?: string): Promise<
       createdAt: Date;
       provider: { id: string; user: { name: string } };
       patient: { id: string; user: { name: string } } | null;
+      patientId: string | null;
     }[]
   >
 > {
@@ -47,7 +49,10 @@ export async function getBookingRequests(status?: string): Promise<
   if (!session?.user) return { success: false, error: "Unauthorized" };
 
   const where: Record<string, unknown> = {};
-  if (status && ["PENDING", "APPROVED", "REJECTED", "CANCELLED", "AWAITING_PATIENT_REPLY"].includes(status)) {
+  if (
+    status &&
+    ["PENDING", "APPROVED", "REJECTED", "CANCELLED", "AWAITING_PATIENT_REPLY"].includes(status)
+  ) {
     where.status = status;
   } else {
     where.status = "PENDING";
@@ -67,13 +72,14 @@ export async function getBookingRequests(status?: string): Promise<
 
 export async function approveBookingRequest(
   id: string,
+  existingPatientId?: string,
 ): Promise<ActionResult<{ appointmentId: string }>> {
   const session = await auth();
   if (!session?.user || !["RECEPTIONIST", "ADMIN"].includes(session.user.role)) {
     return { success: false, error: "Unauthorized" };
   }
 
-  const parsed = approveSchema.safeParse({ id });
+  const parsed = approveSchema.safeParse({ id, patientId: existingPatientId });
   if (!parsed.success) {
     return { success: false, error: "Invalid request ID" };
   }
@@ -86,7 +92,7 @@ export async function approveBookingRequest(
   if (!request) return { success: false, error: "Booking request not found" };
   if (request.status !== "PENDING") return { success: false, error: "Request is not pending" };
 
-  let patientId = request.patientId;
+  let patientId = existingPatientId ?? request.patientId;
 
   if (!patientId) {
     const existing = await db.patient.findFirst({
