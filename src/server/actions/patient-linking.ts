@@ -112,7 +112,7 @@ export async function getCurrentPatient() {
   if (session.user.role !== "PATIENT") return { success: false as const, error: "Not a patient" };
 
   const patient = await db.patient.findUnique({ where: { userId: session.user.id } });
-  if (!patient) return { success: false as const, error: "Patient profile not found" };
+  if (!patient) return { success: true as const, patient: null };
 
   return { success: true as const, patient };
 }
@@ -123,7 +123,7 @@ export async function getMyLinkedProviders() {
   if (!session?.user) return { success: false as const, error: "Unauthorized" };
 
   const patient = await db.patient.findUnique({ where: { userId: session.user.id } });
-  if (!patient) return { success: false as const, error: "Patient profile not found" };
+  if (!patient) return { success: true as const, doctors: [] };
 
   const links = await db.patientProvider.findMany({
     where: { patientId: patient.id },

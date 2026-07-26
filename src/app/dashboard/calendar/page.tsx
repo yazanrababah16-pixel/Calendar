@@ -97,7 +97,6 @@ function CalendarPageContent() {
     queryKey: ["currentPatient"],
     queryFn: async () => {
       const result = await getCurrentPatient();
-      if (!result.success) throw new Error(result.error);
       return result.patient;
     },
     enabled: role === "PATIENT",
@@ -108,7 +107,7 @@ function CalendarPageContent() {
     queryKey: ["myLinkedProviders"],
     queryFn: async () => {
       const result = await getMyLinkedProviders();
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) return [];
       return result.doctors;
     },
     enabled: role === "PATIENT" && !!patientResult,
@@ -119,11 +118,19 @@ function CalendarPageContent() {
     if (role === "ADMIN") return undefined;
     if (role === "PROVIDER") return { providerId: currentProviderResult?.id };
     if (role === "RECEPTIONIST" && selectedProviderId) return { providerId: selectedProviderId };
-    if (role === "PATIENT") return { patientId: patientResult?.id };
+    if (role === "PATIENT" && patientResult?.id) return { patientId: patientResult.id };
     return undefined;
   }, [role, currentProviderResult, selectedProviderId, patientResult]);
 
-  const { data: appointments, isLoading, isError, error } = useQuery(appointmentsQuery(filter));
+  const {
+    data: appointments,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    ...appointmentsQuery(filter),
+    enabled: role !== "PATIENT" || !!patientResult,
+  });
 
   const { data: tentativeBookings } = useQuery({
     queryKey: ["tentativeBookings"],
@@ -149,7 +156,7 @@ function CalendarPageContent() {
   }, [role, currentProviderResult]);
 
   const lockedPatientId = useMemo(() => {
-    if (role === "PATIENT") return patientResult?.id;
+    if (role === "PATIENT" && patientResult?.id) return patientResult.id;
     return undefined;
   }, [role, patientResult]);
 
@@ -203,7 +210,7 @@ function CalendarPageContent() {
       : role === "PROVIDER"
         ? isLoading || !currentProviderResult
         : role === "PATIENT"
-          ? isLoading || patientLoading
+          ? patientLoading || patientResult === undefined
           : isLoading;
 
   if (loading) {
@@ -211,6 +218,29 @@ function CalendarPageContent() {
       <div className="space-y-4">
         <Skeleton className="h-10 w-96" />
         <Skeleton className="h-[600px] w-full" />
+      </div>
+    );
+  }
+
+  if (role === "PATIENT" && patientResult === null) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Calendar</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View your appointments and booking requests
+          </p>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12">
+            <AlertCircle className="size-12 text-muted-foreground" />
+            <p className="text-sm font-medium">No patient profile found</p>
+            <p className="text-xs text-muted-foreground">
+              Please contact the front desk to set up your patient profile before viewing the
+              calendar.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

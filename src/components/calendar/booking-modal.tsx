@@ -17,6 +17,7 @@ import {
   deleteAppointment,
 } from "@/server/actions/appointments";
 import { requestBooking } from "@/server/actions/booking-requests";
+import { getCurrentPatient } from "@/server/actions/patient-linking";
 
 import {
   Dialog,
@@ -173,6 +174,18 @@ export function BookingModal({
     enabled: role !== "PATIENT",
   });
 
+  const { data: myPatientId } = useQuery({
+    queryKey: ["currentPatient"],
+    queryFn: async () => {
+      const result = await getCurrentPatient();
+      return result.patient?.id;
+    },
+    enabled: role === "PATIENT" && !lockedPatientId && !appointment,
+    retry: false,
+  });
+
+  const resolvedPatientId = lockedPatientId ?? appointment?.patientId ?? myPatientId;
+
   const providers = scopedProviders ?? allProviders;
 
   const isEdit = !!appointment;
@@ -188,7 +201,7 @@ export function BookingModal({
 
   const buildFormDefaults = useCallback(
     (): BookingFormData => ({
-      patientId: lockedPatientId ?? appointment?.patientId ?? "",
+      patientId: resolvedPatientId ?? "",
       providerId: lockedProviderId ?? appointment?.providerId ?? "",
       startTime: appointment?.startTime
         ? toLocalDatetimeString(appointment.startTime)
@@ -203,7 +216,7 @@ export function BookingModal({
       color: appointment?.color ?? "#3b82f6",
       rescheduleReason: "",
     }),
-    [appointment, defaultStart, defaultEnd, lockedProviderId, lockedPatientId],
+    [appointment, defaultStart, defaultEnd, lockedProviderId, resolvedPatientId],
   );
 
   const {
@@ -228,6 +241,12 @@ export function BookingModal({
     }
   }, [open, reset, buildFormDefaults]);
 
+  useEffect(() => {
+    if (open && resolvedPatientId && !appointment) {
+      setValue("patientId", resolvedPatientId);
+    }
+  }, [open, resolvedPatientId, appointment, setValue]);
+
   const watchedColor = watch("color") || "#3b82f6";
 
   const patientName =
@@ -238,54 +257,64 @@ export function BookingModal({
   const onSubmit = useCallback(
     async (data: BookingFormData) => {
       setError(null);
-      const formData = new FormData();
-      if (appointment) formData.set("id", appointment.id);
-      formData.set("patientId", data.patientId);
-      formData.set("providerId", data.providerId);
-      formData.set("startTime", new Date(data.startTime).toISOString());
-      formData.set("endTime", new Date(data.endTime).toISOString());
-      if (data.title) formData.set("title", data.title);
+      try {
+        const formData = new FormData();
+        if (appointment) formData.set("id", appointment.id);
+        formData.set("patientId", data.patientId);
+        formData.set("providerId", data.providerId);
+        formData.set("startTime", new Date(data.startTime).toISOString());
+        formData.set("endTime", new Date(data.endTime).toISOString());
+        if (data.title) formData.set("title", data.title);
 
-      let notes = data.notes ?? "";
-      if (data.rescheduleReason) {
-        const prefix = notes ? `${notes}\n---\n` : "";
-        notes = `${prefix}Rescheduled: ${data.rescheduleReason}`;
-      }
-      if (notes) formData.set("notes", notes);
-
-      formData.set("color", data.color || "#3b82f6");
-
-      const isPatientNewBooking = role === "PATIENT" && !appointment;
-      const result = isPatientNewBooking
-        ? await requestBooking(null, formData)
-        : appointment
-          ? await updateAppointment(null, formData)
-          : await bookAppointment(null, formData);
-
-      if (result.success) {
-        queryClient.invalidateQueries({ queryKey: ["appointments"] });
-        if (isPatientNewBooking) {
-          queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
+        let notes = data.notes ?? "";
+        if (data.rescheduleReason) {
+          const prefix = notes ? `${notes}\n---\n` : "";
+          notes = `${prefix}Rescheduled: ${data.rescheduleReason}`;
         }
-        setError(null);
-        setEditMode("none");
-        onOpenChange(false);
+        if (notes) formData.set("notes", notes);
+
+        formData.set("color", data.color || "#3b82f6");
+
+        const isPatientNewBooking = role === "PATIENT" && !appointment;
+        const result = isPatientNewBooking
+          ? await requestBooking(null, formData)
+          : appointment
+            ? await updateAppointment(null, formData)
+            : await bookAppointment(null, formData);
+
+        if (result.success) {
+          queryClient.invalidateQueries({ queryKey: ["appointments"] });
+          if (isPatientNewBooking) {
+            queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
+          }
+          setError(null);
+          setEditMode("none");
+          onOpenChange(false);
+          toast({
+            title: isPatientNewBooking
+              ? "Booking request submitted"
+              : appointment
+                ? "Appointment updated"
+                : "Appointment booked",
+            description: isPatientNewBooking
+              ? "Your request is pending approval from our receptionist."
+              : undefined,
+            type: "success",
+          });
+        } else {
+          setError(result.error);
+          toast({
+            title: appointment ? "Update failed" : "Booking failed",
+            description: result.error,
+            type: "error",
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "An unexpected error occurred";
+        setError(message);
         toast({
-          title: isPatientNewBooking
-            ? "Booking request submitted"
-            : appointment
-              ? "Appointment updated"
-              : "Appointment booked",
-          description: isPatientNewBooking
-            ? "Your request is pending approval from our receptionist."
-            : undefined,
-          type: "success",
-        });
-      } else {
-        setError(result.error);
-        toast({
-          title: appointment ? "Update failed" : "Booking failed",
-          description: result.error,
+          title: "Error",
+          description: message,
           type: "error",
         });
       }
@@ -614,7 +643,14 @@ export function BookingModal({
         {/* ─── Full Edit / New Appointment Mode ─── */}
         {((isEdit && editMode === "full") || !isEdit) && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {role === "PATIENT" || lockedPatientId ? (
+            {Object.keys(errors).length > 0 && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {Object.entries(errors).map(([key, err]) => (
+                  <p key={key}>{err?.message ?? `Invalid ${key}`}</p>
+                ))}
+              </div>
+            )}
+            {role === "PATIENT" || resolvedPatientId ? (
               <input type="hidden" {...register("patientId")} />
             ) : (
               <div className="space-y-2">
@@ -742,14 +778,19 @@ export function BookingModal({
                   {deleting ? "Deleting..." : "Delete Appointment"}
                 </Button>
               )}
-              <Button type="submit" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                disabled={isSubmitting || (role === "PATIENT" && !isEdit && !resolvedPatientId)}
+              >
                 {isSubmitting
                   ? "Saving..."
-                  : isEdit
-                    ? "Save Changes"
-                    : role === "PATIENT"
-                      ? "Submit Request"
-                      : "Book Appointment"}
+                  : role === "PATIENT" && !isEdit && !resolvedPatientId
+                    ? "Loading..."
+                    : isEdit
+                      ? "Save Changes"
+                      : role === "PATIENT"
+                        ? "Submit Request"
+                        : "Book Appointment"}
               </Button>
             </div>
           </form>
