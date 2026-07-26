@@ -8,6 +8,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (session.user.role === "PATIENT") {
+    const patient = await db.patient.findUnique({
+      where: { userId: session.user.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, username: true, image: true } },
+      },
+    });
+    return NextResponse.json(patient ? [patient] : []);
+  }
+
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search");
 

@@ -93,7 +93,7 @@ function CalendarPageContent() {
     enabled: role === "PROVIDER",
   });
 
-  const { data: patientResult } = useQuery({
+  const { data: patientResult, isLoading: patientLoading } = useQuery({
     queryKey: ["currentPatient"],
     queryFn: async () => {
       const result = await getCurrentPatient();
@@ -101,6 +101,7 @@ function CalendarPageContent() {
       return result.patient;
     },
     enabled: role === "PATIENT",
+    retry: false,
   });
 
   const { data: linkedProviders } = useQuery({
@@ -110,7 +111,8 @@ function CalendarPageContent() {
       if (!result.success) throw new Error(result.error);
       return result.doctors;
     },
-    enabled: role === "PATIENT",
+    enabled: role === "PATIENT" && !!patientResult,
+    retry: false,
   });
 
   const filter = useMemo(() => {
@@ -127,9 +129,10 @@ function CalendarPageContent() {
     queryKey: ["tentativeBookings"],
     queryFn: async () => {
       const result = await getTentativeBookings();
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) return [];
       return result.data ?? [];
     },
+    retry: false,
   });
 
   const scopedProviders = useMemo(() => {
@@ -200,7 +203,7 @@ function CalendarPageContent() {
       : role === "PROVIDER"
         ? isLoading || !currentProviderResult
         : role === "PATIENT"
-          ? isLoading || !patientResult || !linkedProviders
+          ? isLoading || patientLoading
           : isLoading;
 
   if (loading) {

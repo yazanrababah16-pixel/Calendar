@@ -168,7 +168,10 @@ export function BookingModal({
   });
 
   const { data: allProviders } = useQuery(providersQuery({ isActive: true }));
-  const { data: patients } = useQuery(patientsQuery());
+  const { data: patients } = useQuery({
+    ...patientsQuery(),
+    enabled: role !== "PATIENT",
+  });
 
   const providers = scopedProviders ?? allProviders;
 
@@ -611,7 +614,7 @@ export function BookingModal({
         {/* ─── Full Edit / New Appointment Mode ─── */}
         {((isEdit && editMode === "full") || !isEdit) && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {lockedPatientId ? (
+            {role === "PATIENT" || lockedPatientId ? (
               <input type="hidden" {...register("patientId")} />
             ) : (
               <div className="space-y-2">
