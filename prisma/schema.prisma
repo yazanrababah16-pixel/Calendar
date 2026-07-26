@@ -344,6 +344,7 @@ model BookingRequest {
   id              String                @id @default(uuid())
   patientPhone    String
   patientName     String?
+  patientEmail    String?
   requestedDate   DateTime              @db.Timestamptz()
   requestedTime   String
   durationMinutes Int                   @default(30)

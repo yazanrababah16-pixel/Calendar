@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     idempotencyKey,
     patientPhone,
     patientName,
+    patientEmail,
     requestedDate,
     requestedTime,
     durationMinutes,
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     idempotencyKey?: string;
     patientPhone?: string;
     patientName?: string;
+    patientEmail?: string;
     requestedDate?: string;
     requestedTime?: string;
     durationMinutes?: number;
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest) {
     data: {
       patientPhone,
       patientName: patientName ?? null,
+      patientEmail: patientEmail ?? null,
       requestedDate: dateObj,
       requestedTime,
       durationMinutes: durationMinutes ?? 30,

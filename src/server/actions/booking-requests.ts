@@ -103,11 +103,12 @@ export async function approveBookingRequest(
       patientId = existing.id;
     } else {
       const slug = request.patientPhone.replace(/[^a-zA-Z0-9]/g, "");
+      const email = request.patientEmail || `whatsapp-${slug}@clinic.local`;
       const patient = await db.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             name: request.patientName || `Patient ${request.patientPhone}`,
-            email: `whatsapp-${slug}@clinic.local`,
+            email,
             passwordHash: "",
             role: "PATIENT",
           },
