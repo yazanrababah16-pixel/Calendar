@@ -10,6 +10,7 @@ import {
   parse,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import type { TentativeBooking } from "@/server/actions/booking-requests";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
@@ -27,15 +28,19 @@ interface Appointment {
 interface WeekViewProps {
   currentDate: Date;
   appointments: Appointment[];
+  tentativeBookings?: TentativeBooking[];
   onSlotClick?: (start: Date) => void;
   onAppointmentClick?: (id: string) => void;
+  onTentativeClick?: (booking: TentativeBooking) => void;
 }
 
 export function WeekView({
   currentDate,
   appointments,
+  tentativeBookings = [],
   onSlotClick,
   onAppointmentClick,
+  onTentativeClick,
 }: WeekViewProps) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -45,6 +50,14 @@ export function WeekView({
     return appointments.filter((apt) => {
       const start = new Date(apt.startTime);
       const end = new Date(apt.endTime);
+      return isSameDay(start, day) && start.getHours() <= hour && end.getHours() > hour;
+    });
+  }
+
+  function getTentativeForDayAndHour(day: Date, hour: number) {
+    return tentativeBookings.filter((b) => {
+      const start = new Date(b.start);
+      const end = new Date(b.end);
       return isSameDay(start, day) && start.getHours() <= hour && end.getHours() > hour;
     });
   }
@@ -101,6 +114,7 @@ export function WeekView({
             </div>
             {days.map((day) => {
               const dayAppointments = getAppointmentsForDayAndHour(day, hour);
+              const dayTentative = getTentativeForDayAndHour(day, hour);
               return (
                 <div
                   key={`${day.toISOString()}-${hour}`}
@@ -145,6 +159,26 @@ export function WeekView({
                       </div>
                     );
                   })}
+                  {dayTentative.map((b) => (
+                    <div
+                      key={`tent-${b.id}`}
+                      className={cn(
+                        "mb-1 cursor-pointer rounded border-2 border-dashed px-2 py-1 text-xs shadow-xs transition-colors hover:opacity-80",
+                        b.status === "AWAITING_PATIENT_REPLY"
+                          ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30"
+                          : "border-amber-400 bg-amber-50 dark:bg-amber-950/30",
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTentativeClick?.(b);
+                      }}
+                    >
+                      <div className="font-medium truncate">{b.patientName ?? b.patientPhone}</div>
+                      <div className="truncate text-muted-foreground">
+                        {format(new Date(b.start), "h:mm a")} &middot; Pending
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             })}

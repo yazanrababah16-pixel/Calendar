@@ -23,6 +23,8 @@ import { getCurrentPatient, getMyLinkedProviders } from "@/server/actions/patien
 import { cancelDayForProvider } from "@/server/actions/appointments";
 import { useToast } from "@/components/ui/toaster";
 import { format } from "date-fns";
+import { getTentativeBookings, type TentativeBooking } from "@/server/actions/booking-requests";
+import { TentativeBookingModal } from "@/components/calendar/tentative-booking-modal";
 
 type AppointmentData = {
   id: string;
@@ -68,6 +70,8 @@ function CalendarPageContent() {
   const [cancelDayOpen, setCancelDayOpen] = useState(false);
   const [cancelDayDate, setCancelDayDate] = useState<Date | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [tentativeModalOpen, setTentativeModalOpen] = useState(false);
+  const [selectedTentative, setSelectedTentative] = useState<TentativeBooking | null>(null);
 
   const { data: assignedResult } = useQuery({
     queryKey: ["assignedProviders"],
@@ -119,6 +123,15 @@ function CalendarPageContent() {
 
   const { data: appointments, isLoading, isError, error } = useQuery(appointmentsQuery(filter));
 
+  const { data: tentativeBookings } = useQuery({
+    queryKey: ["tentativeBookings"],
+    queryFn: async () => {
+      const result = await getTentativeBookings();
+      if (!result.success) throw new Error(result.error);
+      return result.data ?? [];
+    },
+  });
+
   const scopedProviders = useMemo(() => {
     if (role === "ADMIN") return undefined;
     if (role === "PROVIDER") return currentProviderResult ? [currentProviderResult] : undefined;
@@ -148,6 +161,11 @@ function CalendarPageContent() {
     },
     [appointments],
   );
+
+  const handleTentativeClick = useCallback((booking: TentativeBooking) => {
+    setSelectedTentative(booking);
+    setTentativeModalOpen(true);
+  }, []);
 
   const handleCancelDay = useCallback(
     async (date: Date) => {
@@ -278,12 +296,14 @@ function CalendarPageContent() {
 
       <CalendarView
         appointments={appointments ?? []}
+        tentativeBookings={tentativeBookings ?? []}
         onSlotClick={(start) => {
           setSelectedAppointment(undefined);
           setSelectedStart(start.toISOString());
           setModalOpen(true);
         }}
         onAppointmentClick={handleAppointmentClick}
+        onTentativeClick={handleTentativeClick}
         defaultDate={defaultDate}
         defaultView={defaultDate ? "day" : "month"}
       />
@@ -296,6 +316,36 @@ function CalendarPageContent() {
         lockedProviderId={lockedProviderId}
         lockedPatientId={lockedPatientId}
       />
+
+      <TentativeBookingModal
+        open={tentativeModalOpen}
+        onOpenChange={setTentativeModalOpen}
+        booking={selectedTentative}
+      />
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded-full bg-blue-500" />
+          <span>Scheduled</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded-full bg-green-500" />
+          <span>Confirmed</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded-full bg-amber-500" />
+          <span>In Progress</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded border-2 border-dashed border-amber-400 bg-amber-50" />
+          <span>Pending Request</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded border-2 border-dashed border-blue-400 bg-blue-50" />
+          <span>Awaiting Reply</span>
+        </div>
+      </div>
 
       {role === "PROVIDER" && (
         <Dialog open={cancelDayOpen} onOpenChange={setCancelDayOpen}>

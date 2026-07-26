@@ -311,3 +311,49 @@ export async function modifyBookingRequest(
 
   return { success: true };
 }
+
+export type TentativeBooking = {
+  id: string;
+  start: string;
+  end: string;
+  patientPhone: string;
+  patientName: string | null;
+  status: string;
+  providerId: string;
+  providerName: string;
+};
+
+export async function getTentativeBookings(): Promise<ActionResult<TentativeBooking[]>> {
+  const session = await auth();
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+
+  const requests = await db.bookingRequest.findMany({
+    where: {
+      status: { in: ["PENDING", "AWAITING_PATIENT_REPLY"] },
+    },
+    include: {
+      provider: { include: { user: { select: { name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  const bookings: TentativeBooking[] = requests.map((r) => {
+    const start = r.modifiedStart ?? r.requestedDate;
+    const end =
+      r.modifiedEnd ?? new Date(new Date(r.requestedDate).getTime() + r.durationMinutes * 60000);
+
+    return {
+      id: r.id,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      patientPhone: r.patientPhone,
+      patientName: r.patientName,
+      status: r.status,
+      providerId: r.providerId,
+      providerName: r.provider.user.name,
+    };
+  });
+
+  return { success: true, data: bookings };
+}
