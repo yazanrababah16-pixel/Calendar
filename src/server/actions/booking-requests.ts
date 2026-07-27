@@ -388,6 +388,163 @@ const requestBookingSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const patientAcceptSchema = z.object({
+  id: z.string().uuid(),
+});
+
+const patientRescheduleSchema = z.object({
+  id: z.string().uuid(),
+  newStart: z.coerce.date(),
+  newEnd: z.coerce.date(),
+});
+
+export async function patientAcceptBooking(
+  id: string,
+): Promise<ActionResult<{ appointmentId: string }>> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "PATIENT") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const parsed = patientAcceptSchema.safeParse({ id });
+  if (!parsed.success) {
+    return { success: false, error: "Invalid request ID" };
+  }
+
+  const patient = await db.patient.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, phone: true },
+  });
+  if (!patient) return { success: false, error: "Patient profile not found" };
+
+  const request = await db.bookingRequest.findUnique({
+    where: { id },
+    include: { provider: { include: { user: { select: { name: true } } } } },
+  });
+
+  if (!request) return { success: false, error: "Booking request not found" };
+  if (request.status !== "AWAITING_PATIENT_REPLY") {
+    return { success: false, error: "Request is not awaiting your reply" };
+  }
+  if (request.patientId !== patient.id) {
+    return { success: false, error: "You can only respond to your own requests" };
+  }
+
+  const startTime = request.modifiedStart ?? request.requestedDate;
+  const endTime =
+    request.modifiedEnd ??
+    new Date(new Date(request.requestedDate).getTime() + request.durationMinutes * 60000);
+
+  const overlap = await db.appointment.findFirst({
+    where: {
+      providerId: request.providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+    },
+  });
+
+  if (overlap) {
+    return {
+      success: false,
+      error: "This time slot is already booked. Please propose a different time.",
+    };
+  }
+
+  const appointment = await db.appointment.create({
+    data: {
+      providerId: request.providerId,
+      patientId: patient.id,
+      startTime,
+      endTime,
+      title: `Web booking — ${patient.phone}`,
+      status: "SCHEDULED",
+    },
+  });
+
+  await db.bookingRequest.update({
+    where: { id },
+    data: {
+      status: "APPROVED",
+      appointmentId: appointment.id,
+    },
+  });
+
+  revalidatePath("/dashboard/calendar");
+
+  return { success: true, data: { appointmentId: appointment.id } };
+}
+
+export async function patientRescheduleBooking(
+  id: string,
+  newStart: Date,
+  newEnd: Date,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "PATIENT") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const parsed = patientRescheduleSchema.safeParse({ id, newStart, newEnd });
+  if (!parsed.success) {
+    const issue = parsed.error.issues?.[0];
+    return { success: false, error: issue?.message ?? "Invalid input" };
+  }
+
+  const patient = await db.patient.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true },
+  });
+  if (!patient) return { success: false, error: "Patient profile not found" };
+
+  const request = await db.bookingRequest.findUnique({
+    where: { id },
+    include: { provider: { include: { user: { select: { name: true } } } } },
+  });
+
+  if (!request) return { success: false, error: "Booking request not found" };
+  if (request.status !== "AWAITING_PATIENT_REPLY") {
+    return { success: false, error: "Request is not awaiting your reply" };
+  }
+  if (request.patientId !== patient.id) {
+    return { success: false, error: "You can only respond to your own requests" };
+  }
+
+  const startDT = parsed.data.newStart;
+  const endDT = parsed.data.newEnd;
+
+  if (startDT >= endDT) {
+    return { success: false, error: "Start time must be before end time" };
+  }
+
+  const overlap = await db.appointment.findFirst({
+    where: {
+      providerId: request.providerId,
+      status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      startTime: { lt: endDT },
+      endTime: { gt: startDT },
+    },
+  });
+
+  if (overlap) {
+    return { success: false, error: "That time slot is already booked. Please choose another." };
+  }
+
+  await db.bookingRequest.update({
+    where: { id },
+    data: {
+      status: "PENDING",
+      modifiedStart: startDT,
+      modifiedEnd: endDT,
+    },
+  });
+
+  revalidatePath("/dashboard/calendar");
+  revalidatePath("/dashboard/receptionist/requests");
+
+  return { success: true };
+}
+
 export async function requestBooking(
   _prevState: ActionResult | null,
   formData: FormData,

@@ -9,7 +9,7 @@ import { CalendarView } from "@/components/calendar/calendar-view";
 import { BookingModal } from "@/components/calendar/booking-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle, Filter, CalendarOff, Loader2 } from "lucide-react";
+import { AlertCircle, Filter, CalendarOff, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -141,6 +141,11 @@ function CalendarPageContent() {
     },
     retry: false,
   });
+
+  const actionRequiredCount = useMemo(() => {
+    if (!tentativeBookings) return 0;
+    return tentativeBookings.filter((b) => b.status === "AWAITING_PATIENT_REPLY").length;
+  }, [tentativeBookings]);
 
   const scopedProviders = useMemo(() => {
     if (role === "ADMIN") return undefined;
@@ -331,6 +336,17 @@ function CalendarPageContent() {
         </div>
       )}
 
+      {role === "PATIENT" && actionRequiredCount > 0 && (
+        <div className="flex items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          <AlertTriangle className="size-4 shrink-0 text-blue-600" />
+          <span>
+            <span className="font-medium">Action Required</span> — {actionRequiredCount}{" "}
+            {actionRequiredCount === 1 ? "appointment needs" : "appointments need"} your response.
+            Click the blue blocks below to respond.
+          </span>
+        </div>
+      )}
+
       <CalendarView
         appointments={appointments ?? []}
         tentativeBookings={tentativeBookings ?? []}
@@ -380,7 +396,9 @@ function CalendarPageContent() {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="size-3 rounded border-2 border-dashed border-blue-400 bg-blue-50" />
-          <span>Awaiting Reply</span>
+          <span>
+            {role === "PATIENT" ? "Action Required (click to respond)" : "Awaiting Reply"}
+          </span>
         </div>
       </div>
 
