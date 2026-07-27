@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createAppointmentSchema } from "@/lib/schemas/appointment";
@@ -196,6 +197,66 @@ export async function deleteAppointment(id: string): Promise<ActionResult> {
 
   await db.appointment.delete({ where: { id } });
   return { success: true, id };
+}
+
+export async function patientRequestReschedule(appointmentId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "PATIENT") {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const patient = await db.patient.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, user: { select: { name: true } } },
+  });
+  if (!patient) return { success: false, error: "Patient profile not found" };
+
+  const appointment = await db.appointment.findUnique({ where: { id: appointmentId } });
+  if (!appointment) return { success: false, error: "Appointment not found" };
+  if (appointment.patientId !== patient.id) {
+    return { success: false, error: "You can only reschedule your own appointments" };
+  }
+  if (!["SCHEDULED", "CONFIRMED"].includes(appointment.status)) {
+    return {
+      success: false,
+      error: "This appointment cannot be rescheduled in its current state",
+    };
+  }
+
+  await db.appointment.update({
+    where: { id: appointmentId },
+    data: { status: "RESCHEDULE_REQUESTED" },
+  });
+
+  const dateStr = new Date(appointment.startTime).toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const staff = await db.user.findMany({
+    where: { role: { in: ["RECEPTIONIST", "ADMIN"] } },
+    select: { id: true },
+  });
+
+  if (staff.length > 0) {
+    await db.notification.createMany({
+      data: staff.map((s) => ({
+        type: "patient_reschedule_request",
+        message: `${patient.user.name} requested rescheduling for ${dateStr}.`,
+        senderId: session.user.id,
+        receiverId: s.id,
+        relatedEntityId: appointmentId,
+        relatedEntityType: "appointment",
+      })),
+    });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/calendar");
+
+  return { success: true, id: appointmentId };
 }
 
 export async function cancelDayForProvider(

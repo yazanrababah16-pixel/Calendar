@@ -15,6 +15,7 @@ import {
   cancelAppointment,
   updateAppointment,
   deleteAppointment,
+  patientRequestReschedule,
 } from "@/server/actions/appointments";
 import { requestBooking } from "@/server/actions/booking-requests";
 import { getCurrentPatient } from "@/server/actions/patient-linking";
@@ -111,6 +112,8 @@ const statusLabels: Record<string, string> = {
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
   NO_SHOW: "No Show",
+  NEEDS_RESCHEDULE: "Needs Reschedule",
+  RESCHEDULE_REQUESTED: "Reschedule Requested",
 };
 
 const statusColors: Record<string, string> = {
@@ -121,6 +124,7 @@ const statusColors: Record<string, string> = {
   CANCELLED: "text-red-600 bg-red-50",
   NO_SHOW: "text-red-600 bg-red-50",
   NEEDS_RESCHEDULE: "text-orange-600 bg-orange-50",
+  RESCHEDULE_REQUESTED: "text-purple-600 bg-purple-50",
 };
 
 export function BookingModal({
@@ -138,6 +142,7 @@ export function BookingModal({
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [requestingReschedule, setRequestingReschedule] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [editMode, setEditMode] = useState<"none" | "reschedule" | "full">("none");
   const [generateInvoiceOpen, setGenerateInvoiceOpen] = useState(false);
@@ -360,6 +365,29 @@ export function BookingModal({
     }
   }, [appointment, queryClient, onOpenChange, toast]);
 
+  const handlePatientRescheduleRequest = useCallback(async () => {
+    if (!appointment) return;
+    setRequestingReschedule(true);
+    const result = await patientRequestReschedule(appointment.id);
+    setRequestingReschedule(false);
+
+    if (result.success) {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+      setError(null);
+      setEditMode("none");
+      onOpenChange(false);
+      toast({
+        title: "Reschedule requested",
+        description: "Your request has been sent to the front desk.",
+        type: "success",
+      });
+    } else {
+      setError(result.error);
+      toast({ title: "Request failed", description: result.error, type: "error" });
+    }
+  }, [appointment, queryClient, onOpenChange, toast]);
+
   const handleEmrSubmit = useCallback(async () => {
     if (!appointment) return;
     setEmrSubmitting(true);
@@ -577,6 +605,30 @@ export function BookingModal({
             )}
           </div>
         )}
+
+        {/* ─── Patient Request Reschedule Button ─── */}
+        {isEdit &&
+          role === "PATIENT" &&
+          editMode === "none" &&
+          appointment &&
+          ["SCHEDULED", "CONFIRMED"].includes(appointment.status) && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handlePatientRescheduleRequest}
+                disabled={requestingReschedule}
+              >
+                {requestingReschedule ? (
+                  <Clock className="mr-1 size-4 animate-spin" />
+                ) : (
+                  <Calendar className="mr-1 size-4" />
+                )}
+                {requestingReschedule ? "Requesting..." : "Request Reschedule"}
+              </Button>
+            </div>
+          )}
 
         {/* ─── Reschedule Mode ─── */}
         {isEdit && editMode === "reschedule" && (

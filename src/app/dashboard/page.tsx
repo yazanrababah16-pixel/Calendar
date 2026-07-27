@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { LinkByUsername } from "@/components/patients/link-by-username";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
+import { RescheduleButton } from "@/components/appointments/reschedule-button";
 
 const statusBadge: Record<string, string> = {
   SCHEDULED: "bg-blue-100 text-blue-700 border-blue-200",
@@ -22,6 +23,8 @@ const statusBadge: Record<string, string> = {
   COMPLETED: "bg-gray-100 text-gray-600 border-gray-200",
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
   NO_SHOW: "bg-red-100 text-red-700 border-red-200",
+  NEEDS_RESCHEDULE: "bg-orange-100 text-orange-700 border-orange-200",
+  RESCHEDULE_REQUESTED: "bg-purple-100 text-purple-700 border-purple-200",
 };
 
 const statusIcon: Record<string, React.ReactNode> = {
@@ -31,6 +34,8 @@ const statusIcon: Record<string, React.ReactNode> = {
   COMPLETED: <CheckCircle2 className="size-4 text-gray-500" />,
   CANCELLED: <XCircle className="size-4 text-red-600" />,
   NO_SHOW: <XCircle className="size-4 text-red-600" />,
+  NEEDS_RESCHEDULE: <AlertTriangle className="size-4 text-orange-600" />,
+  RESCHEDULE_REQUESTED: <AlertTriangle className="size-4 text-purple-600" />,
 };
 
 function extractRescheduleReason(notes: string | null): string | null {
@@ -195,6 +200,9 @@ async function PatientDashboard({ userId }: { userId: string }) {
                       >
                         {apt.status.replace("_", " ")}
                       </span>
+                    </div>
+                    <div className="mt-3">
+                      <RescheduleButton appointmentId={apt.id} status={apt.status} />
                     </div>
                   </CardContent>
                 </Card>

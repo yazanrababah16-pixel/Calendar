@@ -31,7 +31,7 @@ export function NotificationBell() {
       return result.count;
     },
     refetchInterval: 30000,
-    enabled: !!role && ["RECEPTIONIST", "PROVIDER", "ADMIN"].includes(role),
+    enabled: !!role,
   });
 
   const { data: notifications } = useQuery({
@@ -64,7 +64,7 @@ export function NotificationBell() {
     queryClient.invalidateQueries({ queryKey: ["unreadNotifications"] });
   }, [queryClient]);
 
-  if (!role || !["RECEPTIONIST", "PROVIDER", "ADMIN"].includes(role)) return null;
+  if (!role) return null;
 
   const unreadCount = countData ?? 0;
 
@@ -121,6 +121,8 @@ export function NotificationBell() {
                       router.push(`/dashboard/receptionist/reschedule?${qs.toString()}`);
                     } else if (n.type === "booking_request") {
                       router.push("/dashboard/receptionist/requests");
+                    } else if (n.type === "patient_reschedule_request") {
+                      router.push("/dashboard");
                     }
                     setOpen(false);
                   }}

@@ -69,6 +69,7 @@ export function MonthView({
     CANCELLED: "bg-red-300",
     NO_SHOW: "bg-red-300",
     NEEDS_RESCHEDULE: "bg-orange-400",
+    RESCHEDULE_REQUESTED: "bg-purple-500",
   };
 
   return (

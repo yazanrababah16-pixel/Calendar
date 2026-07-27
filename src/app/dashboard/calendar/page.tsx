@@ -400,6 +400,10 @@ function CalendarPageContent() {
             {role === "PATIENT" ? "Action Required (click to respond)" : "Awaiting Reply"}
           </span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="size-3 rounded-full bg-purple-500" />
+          <span>Reschedule Requested</span>
+        </div>
       </div>
 
       {role === "PROVIDER" && (
