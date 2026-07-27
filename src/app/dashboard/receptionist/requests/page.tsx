@@ -125,6 +125,7 @@ function RequestsPageContent() {
           setSelectedRequest(null);
           queryClient.invalidateQueries({ queryKey: ["bookingRequests"] });
           queryClient.invalidateQueries({ queryKey: ["appointments"] });
+          queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
@@ -157,6 +158,7 @@ function RequestsPageContent() {
           setSelectedRequest(null);
           queryClient.invalidateQueries({ queryKey: ["bookingRequests"] });
           queryClient.invalidateQueries({ queryKey: ["appointments"] });
+          queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }
@@ -219,6 +221,7 @@ function RequestsPageContent() {
           setSelectedRequest(null);
           setShowModify(false);
           queryClient.invalidateQueries({ queryKey: ["bookingRequests"] });
+          queryClient.invalidateQueries({ queryKey: ["tentativeBookings"] });
         } else {
           toast({ title: "Failed", description: result.error, type: "error" });
         }

@@ -195,6 +195,7 @@ export async function approveBookingRequest(
   }).catch(() => {});
 
   revalidatePath("/dashboard/receptionist/requests");
+  revalidatePath("/dashboard/calendar");
 
   return { success: true, data: { appointmentId: appointment.id } };
 }
@@ -318,6 +319,7 @@ export async function modifyBookingRequest(
   }).catch(() => {});
 
   revalidatePath("/dashboard/receptionist/requests");
+  revalidatePath("/dashboard/calendar");
 
   return { success: true };
 }
