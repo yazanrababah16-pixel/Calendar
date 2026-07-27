@@ -10,7 +10,7 @@ services:
     environment:
       DATABASE_URL: "postgresql://calendar:calendar@postgres:5432/calendar?schema=public"
       DIRECT_DATABASE_URL: "postgresql://calendar:calendar@postgres:5432/calendar?schema=public"
-      N8N_WEBHOOK_BASE_URL: "http://n8n:5678"
+      N8N_WEBHOOK_URL: "http://n8n:5678"
       N8N_WEBHOOK_SECRET: "${N8N_WEBHOOK_SECRET:-local-dev-secret}"
       AUTH_SECRET: "${AUTH_SECRET:-local-dev-auth-secret}"
       NEXTAUTH_URL: "http://localhost:3000"

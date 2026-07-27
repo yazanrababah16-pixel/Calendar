@@ -7,7 +7,7 @@ type N8nWorkflowPayload = Record<string, unknown>;
 
 export async function triggerN8nWorkflow(workflowId: string, payload: N8nWorkflowPayload) {
   const secret = process.env.N8N_WEBHOOK_SECRET;
-  const baseUrl = process.env.N8N_WEBHOOK_BASE_URL;
+  const baseUrl = process.env.N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_BASE_URL;
 
   if (!secret || !baseUrl) {
     console.warn("N8N not configured — skipping workflow trigger");
