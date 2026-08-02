@@ -280,7 +280,7 @@ export async function cancelDayForProvider(
     return { success: false, error: "Provider profile not found" };
   }
 
-  const [year, month, day] = date.split("-").map(Number);
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
   const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
   const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
@@ -338,7 +338,7 @@ export async function getRescheduleQueue(providerId: string, date: string) {
   const session = await auth();
   if (!session?.user) return { success: false as const, error: "Unauthorized" };
 
-  const [year, month, day] = date.split("-").map(Number);
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
   const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
   const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
@@ -539,7 +539,7 @@ export async function emergencyCancelDoctorDay(
     return { success: false, error: "Provider not found" };
   }
 
-  const [year, month, day] = date.split("-").map(Number);
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
   const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
   const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
