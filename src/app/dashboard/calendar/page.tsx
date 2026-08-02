@@ -100,6 +100,7 @@ function CalendarPageContent() {
     queryKey: ["currentPatient"],
     queryFn: async () => {
       const result = await getCurrentPatient();
+      if (!result.success) return null;
       return result.patient;
     },
     enabled: role === "PATIENT",
