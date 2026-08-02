@@ -280,10 +280,9 @@ export async function cancelDayForProvider(
     return { success: false, error: "Provider profile not found" };
   }
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const [year, month, day] = date.split("-").map(Number);
+  const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
   const appointments = await db.appointment.findMany({
     where: {
@@ -339,10 +338,9 @@ export async function getRescheduleQueue(providerId: string, date: string) {
   const session = await auth();
   if (!session?.user) return { success: false as const, error: "Unauthorized" };
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const [year, month, day] = date.split("-").map(Number);
+  const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
   const appointments = await db.appointment.findMany({
     where: {
@@ -541,10 +539,9 @@ export async function emergencyCancelDoctorDay(
     return { success: false, error: "Provider not found" };
   }
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+  const [year, month, day] = date.split("-").map(Number);
+  const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+  const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
   const affectedAppointments = await db.appointment.findMany({
     where: {
