@@ -2,41 +2,11 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  CalendarDays,
-  Stethoscope,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  DollarSign,
-  Receipt,
-} from "lucide-react";
+import { CalendarDays, Stethoscope, Clock, AlertTriangle, DollarSign, Receipt } from "lucide-react";
 import { LinkByUsername } from "@/components/patients/link-by-username";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 import { RescheduleButton } from "@/components/appointments/reschedule-button";
-
-const statusBadge: Record<string, string> = {
-  SCHEDULED: "bg-blue-100 text-blue-700 border-blue-200",
-  CONFIRMED: "bg-green-100 text-green-700 border-green-200",
-  IN_PROGRESS: "bg-amber-100 text-amber-700 border-amber-200",
-  COMPLETED: "bg-gray-100 text-gray-600 border-gray-200",
-  CANCELLED: "bg-red-100 text-red-700 border-red-200",
-  NO_SHOW: "bg-red-100 text-red-700 border-red-200",
-  NEEDS_RESCHEDULE: "bg-orange-100 text-orange-700 border-orange-200",
-  RESCHEDULE_REQUESTED: "bg-purple-100 text-purple-700 border-purple-200",
-};
-
-const statusIcon: Record<string, React.ReactNode> = {
-  SCHEDULED: <Clock className="size-4 text-blue-600" />,
-  CONFIRMED: <CheckCircle2 className="size-4 text-green-600" />,
-  IN_PROGRESS: <AlertTriangle className="size-4 text-amber-600" />,
-  COMPLETED: <CheckCircle2 className="size-4 text-gray-500" />,
-  CANCELLED: <XCircle className="size-4 text-red-600" />,
-  NO_SHOW: <XCircle className="size-4 text-red-600" />,
-  NEEDS_RESCHEDULE: <AlertTriangle className="size-4 text-orange-600" />,
-  RESCHEDULE_REQUESTED: <AlertTriangle className="size-4 text-purple-600" />,
-};
+import { statusBadgeStyles, statusIcons } from "@/lib/constants/appointment-status";
 
 function extractRescheduleReason(notes: string | null): string | null {
   if (!notes) return null;
@@ -165,7 +135,10 @@ async function PatientDashboard({ userId }: { userId: string }) {
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          {statusIcon[apt.status] ?? <Clock className="size-4" />}
+                          {(() => {
+                            const Icon = statusIcons[apt.status] ?? Clock;
+                            return <Icon className="size-4" />;
+                          })()}
                           <p className="font-medium">{apt.title || "Appointment"}</p>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -195,7 +168,7 @@ async function PatientDashboard({ userId }: { userId: string }) {
                       </div>
                       <span
                         className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                          statusBadge[apt.status] ?? "bg-gray-100 text-gray-600"
+                          statusBadgeStyles[apt.status] ?? "bg-gray-100 text-gray-600"
                         }`}
                       >
                         {apt.status.replace("_", " ")}
@@ -232,9 +205,10 @@ async function PatientDashboard({ userId }: { userId: string }) {
                 className="flex items-center justify-between rounded-lg border p-3 text-sm"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {statusIcon[apt.status] ?? (
-                    <Clock className="size-4 shrink-0 text-muted-foreground" />
-                  )}
+                  {(() => {
+                    const Icon = statusIcons[apt.status] ?? Clock;
+                    return <Icon className="size-4 shrink-0 text-muted-foreground" />;
+                  })()}
                   <div className="min-w-0">
                     <p className="font-medium truncate">{apt.title || "Appointment"}</p>
                     <p className="text-xs text-muted-foreground truncate">
@@ -249,7 +223,7 @@ async function PatientDashboard({ userId }: { userId: string }) {
                 </div>
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                    statusBadge[apt.status] ?? "bg-gray-100 text-gray-600"
+                    statusBadgeStyles[apt.status] ?? "bg-gray-100 text-gray-600"
                   }`}
                 >
                   {apt.status.replace("_", " ")}

@@ -16,6 +16,7 @@ import {
   DollarSign,
   CalendarClock,
   MessageSquare,
+  Bell,
 } from "lucide-react";
 
 type NavItem = {
@@ -79,6 +80,12 @@ const navItems: NavItem[] = [
     href: "/dashboard/receptionist/requests",
     icon: MessageSquare,
     roles: ["RECEPTIONIST", "ADMIN"],
+  },
+  {
+    labelKey: "nav.notifications",
+    href: "/dashboard/notifications",
+    icon: Bell,
+    roles: ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   },
   {
     labelKey: "nav.settings",

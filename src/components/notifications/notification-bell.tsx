@@ -12,6 +12,7 @@ import {
   markAllAsRead,
   getUnreadCount,
 } from "@/server/actions/notifications";
+import { getNotificationConfig } from "@/lib/constants/notification-types";
 
 export function NotificationBell() {
   const { data: session } = useSession();
@@ -64,6 +65,27 @@ export function NotificationBell() {
     queryClient.invalidateQueries({ queryKey: ["unreadNotifications"] });
   }, [queryClient]);
 
+  const handleNotificationClick = useCallback(
+    async (n: { id: string; type: string; relatedEntityType?: string | null }) => {
+      await handleMarkRead(n.id);
+      const config = getNotificationConfig(n.type);
+
+      if (n.type === "reschedule_request" && n.relatedEntityType) {
+        const parts = n.relatedEntityType.split("|");
+        const rescheduleDate = parts[0] ?? "";
+        const rescheduleProviderId = parts[1] ?? "";
+        const qs = new URLSearchParams();
+        if (rescheduleDate) qs.set("date", rescheduleDate);
+        if (rescheduleProviderId) qs.set("providerId", rescheduleProviderId);
+        router.push(`/dashboard/receptionist/reschedule?${qs.toString()}`);
+      } else {
+        router.push(config.route);
+      }
+      setOpen(false);
+    },
+    [handleMarkRead, router],
+  );
+
   if (!role) return null;
 
   const unreadCount = countData ?? 0;
@@ -88,16 +110,28 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border bg-background shadow-lg">
           <div className="flex items-center justify-between border-b px-3 py-2">
             <p className="text-sm font-medium">Notifications</p>
-            {unreadCount > 0 && (
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <CheckCheck className="size-3" />
+                  Mark all read
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleMarkAllRead}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  router.push("/dashboard/notifications");
+                  setOpen(false);
+                }}
+                className="text-xs text-primary hover:underline"
               >
-                <CheckCheck className="size-3" />
-                Mark all read
+                View all
               </button>
-            )}
+            </div>
           </div>
           <div className="max-h-[320px] overflow-y-auto">
             {!notifications || notifications.length === 0 ? (
@@ -107,25 +141,7 @@ export function NotificationBell() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={async () => {
-                    await handleMarkRead(n.id);
-                    if (n.type === "leave_notification") {
-                      router.push("/dashboard/calendar");
-                    } else if (n.type === "reschedule_request" && n.relatedEntityType) {
-                      const parts = n.relatedEntityType.split("|");
-                      const rescheduleDate = parts[0] ?? "";
-                      const rescheduleProviderId = parts[1] ?? "";
-                      const qs = new URLSearchParams();
-                      if (rescheduleDate) qs.set("date", rescheduleDate);
-                      if (rescheduleProviderId) qs.set("providerId", rescheduleProviderId);
-                      router.push(`/dashboard/receptionist/reschedule?${qs.toString()}`);
-                    } else if (n.type === "booking_request") {
-                      router.push("/dashboard/receptionist/requests");
-                    } else if (n.type === "patient_reschedule_request") {
-                      router.push("/dashboard");
-                    }
-                    setOpen(false);
-                  }}
+                  onClick={() => handleNotificationClick(n)}
                   className="flex w-full items-start gap-3 px-3 py-2.5 text-left text-sm hover:bg-accent transition-colors border-b last:border-0"
                 >
                   <div className="flex-1 min-w-0">

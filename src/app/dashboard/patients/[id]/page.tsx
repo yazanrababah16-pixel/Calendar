@@ -6,29 +6,23 @@ import Link from "next/link";
 import { patientQuery } from "@/lib/queries/patients";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Mail, Phone, Calendar, Stethoscope } from "lucide-react";
-
-const statusLabels: Record<string, string> = {
-  SCHEDULED: "Scheduled",
-  CONFIRMED: "Confirmed",
-  IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  NO_SHOW: "No Show",
-};
-
-const statusColors: Record<string, string> = {
-  SCHEDULED: "text-blue-600 bg-blue-50",
-  CONFIRMED: "text-green-600 bg-green-50",
-  IN_PROGRESS: "text-amber-600 bg-amber-50",
-  COMPLETED: "text-gray-600 bg-gray-100",
-  CANCELLED: "text-red-600 bg-red-50",
-  NO_SHOW: "text-red-600 bg-red-50",
-};
+import { ArrowLeft, Mail, Phone, Calendar, Stethoscope, Users } from "lucide-react";
+import { statusLabels, statusColors } from "@/lib/constants/appointment-status";
+import { getPatientLinkedProviders } from "@/server/actions/patient-linking";
 
 export default function PatientDetailPage() {
   const params = useParams<{ id: string }>();
   const { data: patient, isLoading } = useQuery(patientQuery(params.id));
+
+  const { data: linkedResult } = useQuery({
+    queryKey: ["patientLinkedProviders", params.id],
+    queryFn: async () => {
+      const result = await getPatientLinkedProviders(params.id);
+      if (!result.success) throw new Error(result.error);
+      return result.providers;
+    },
+    enabled: !!params.id,
+  });
 
   if (isLoading) {
     return (
@@ -79,15 +73,49 @@ export default function PatientDetailPage() {
         </CardContent>
       </Card>
 
-      {patient.appointments.length > 0 && (
+      {linkedResult && linkedResult.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Stethoscope className="size-4" />
-              Appointment History
+              <Users className="size-4" />
+              Linked Providers
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {linkedResult.map((provider) => (
+                <div key={provider.id} className="flex items-center gap-3 rounded-lg border p-3">
+                  <Stethoscope className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{provider.user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{provider.specialty}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Stethoscope className="size-4" />
+            Appointment History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {patient.appointments.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <p>No appointments yet.</p>
+              <Link
+                href="/dashboard/calendar"
+                className="mt-2 inline-block text-primary hover:underline"
+              >
+                Book the first appointment for {patient.user.name}
+              </Link>
+            </div>
+          ) : (
             <div className="space-y-2">
               {patient.appointments.map((apt) => (
                 <div
@@ -118,9 +146,9 @@ export default function PatientDetailPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -7,18 +7,31 @@ export const appointmentStatuses = [
   "COMPLETED",
   "CANCELLED",
   "NO_SHOW",
+  "NEEDS_RESCHEDULE",
+  "RESCHEDULE_REQUESTED",
+  "EMERGENCY_CANCELLED",
 ] as const;
 
 const hexColorRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
-export const createAppointmentSchema = z.object({
+export const createAppointmentSchema = z
+  .object({
+    providerId: z.string().uuid(),
+    patientId: z.string().uuid(),
+    startTime: z.string().datetime({ offset: true }),
+    endTime: z.string().datetime({ offset: true }),
+    title: z.string().max(200).optional(),
+    notes: z.string().max(2000).optional(),
+    color: z.string().regex(hexColorRegex, "Invalid hex color").optional(),
+  })
+  .refine((data) => new Date(data.endTime) > new Date(data.startTime), {
+    message: "End time must be after start time",
+    path: ["endTime"],
+  });
+
+export const emergencyCancelSchema = z.object({
   providerId: z.string().uuid(),
-  patientId: z.string().uuid(),
-  startTime: z.string().datetime({ offset: true }),
-  endTime: z.string().datetime({ offset: true }),
-  title: z.string().max(200).optional(),
-  notes: z.string().max(2000).optional(),
-  color: z.string().regex(hexColorRegex, "Invalid hex color").optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format"),
 });
 
 export const updateAppointmentSchema = z.object({

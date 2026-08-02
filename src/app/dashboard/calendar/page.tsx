@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { appointmentsQuery } from "@/lib/queries/appointments";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { BookingModal } from "@/components/calendar/booking-modal";
+import { CalendarLegend } from "@/components/calendar/calendar-legend";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Filter, CalendarOff, Loader2, AlertTriangle } from "lucide-react";
@@ -25,6 +26,7 @@ import { useToast } from "@/components/ui/toaster";
 import { format } from "date-fns";
 import { getTentativeBookings, type TentativeBooking } from "@/server/actions/booking-requests";
 import { TentativeBookingModal } from "@/components/calendar/tentative-booking-modal";
+import { EmergencyCancelDialog } from "@/components/calendar/emergency-cancel-dialog";
 
 type AppointmentData = {
   id: string;
@@ -72,6 +74,7 @@ function CalendarPageContent() {
   const [cancelling, setCancelling] = useState(false);
   const [tentativeModalOpen, setTentativeModalOpen] = useState(false);
   const [selectedTentative, setSelectedTentative] = useState<TentativeBooking | null>(null);
+  const [emergencyCancelOpen, setEmergencyCancelOpen] = useState(false);
 
   const { data: assignedResult } = useQuery({
     queryKey: ["assignedProviders"],
@@ -377,34 +380,18 @@ function CalendarPageContent() {
       />
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full bg-blue-500" />
-          <span>Scheduled</span>
+      <CalendarLegend patientMode={role === "PATIENT"} />
+
+      {(role === "ADMIN" || role === "RECEPTIONIST") && (
+        <div className="flex justify-end">
+          <Button variant="destructive" size="sm" onClick={() => setEmergencyCancelOpen(true)}>
+            <AlertTriangle className="mr-1 size-4" />
+            Emergency Cancel Day
+          </Button>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full bg-green-500" />
-          <span>Confirmed</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full bg-amber-500" />
-          <span>In Progress</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded border-2 border-dashed border-amber-400 bg-amber-50" />
-          <span>Pending Request</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded border-2 border-dashed border-blue-400 bg-blue-50" />
-          <span>
-            {role === "PATIENT" ? "Action Required (click to respond)" : "Awaiting Reply"}
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="size-3 rounded-full bg-purple-500" />
-          <span>Reschedule Requested</span>
-        </div>
-      </div>
+      )}
+
+      <EmergencyCancelDialog open={emergencyCancelOpen} onOpenChange={setEmergencyCancelOpen} />
 
       {role === "PROVIDER" && (
         <Dialog open={cancelDayOpen} onOpenChange={setCancelDayOpen}>

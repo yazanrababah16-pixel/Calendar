@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { createAppointmentSchema } from "@/lib/schemas/appointment";
+import { createAppointmentSchema, emergencyCancelSchema } from "@/lib/schemas/appointment";
 import { triggerN8nWorkflow } from "@/server/actions/n8n";
 import { checkAvailability } from "@/server/actions/availability";
+import { createBulkNotifications } from "@/server/actions/notifications";
+import {
+  EMERGENCY_CANCELLATION_MESSAGE,
+  EMERGENCY_CANCELLATION_STAFF_MESSAGE,
+} from "@/lib/constants/notification-messages";
 
 type ActionResult = { success: true; id: string } | { success: false; error: string };
 
@@ -509,4 +514,108 @@ export async function rescheduleAppointment(
   });
 
   return { success: true };
+}
+
+export async function emergencyCancelDoctorDay(
+  providerId: string,
+  date: string,
+): Promise<
+  { success: true; flagged: number; notificationsSent: number } | { success: false; error: string }
+> {
+  const session = await auth();
+  if (!session?.user || !["ADMIN", "RECEPTIONIST"].includes(session.user.role)) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const parsed = emergencyCancelSchema.safeParse({ providerId, date });
+  if (!parsed.success) {
+    const issue = parsed.error.issues?.[0];
+    return { success: false, error: issue?.message ?? "Invalid input" };
+  }
+
+  const provider = await db.provider.findUnique({
+    where: { id: providerId },
+    include: { user: { select: { id: true, name: true } } },
+  });
+  if (!provider) {
+    return { success: false, error: "Provider not found" };
+  }
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const affectedAppointments = await db.appointment.findMany({
+    where: {
+      providerId,
+      status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
+      startTime: { gte: dayStart, lte: dayEnd },
+    },
+    select: { id: true, patientId: true },
+  });
+
+  if (affectedAppointments.length === 0) {
+    return { success: false, error: "No active appointments found for this date" };
+  }
+
+  await db.appointment.updateMany({
+    where: {
+      providerId,
+      status: { in: ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"] },
+      startTime: { gte: dayStart, lte: dayEnd },
+    },
+    data: { status: "EMERGENCY_CANCELLED" },
+  });
+
+  const patientIds = [...new Set(affectedAppointments.map((a) => a.patientId))];
+  const patients = await db.patient.findMany({
+    where: { id: { in: patientIds } },
+    select: { userId: true },
+  });
+  const patientUserIds = patients.map((p) => p.userId);
+
+  const formattedDate = dayStart.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  let notificationsSent = 0;
+
+  if (patientUserIds.length > 0) {
+    const patientNotif = await createBulkNotifications({
+      senderId: provider.userId,
+      receiverIds: patientUserIds,
+      type: "emergency_cancellation",
+      message: EMERGENCY_CANCELLATION_MESSAGE(provider.user.name),
+      relatedEntityId: affectedAppointments[0]?.id ?? providerId,
+      relatedEntityType: "appointment",
+    });
+    if (patientNotif.success) notificationsSent += patientNotif.created;
+  }
+
+  const staff = await db.user.findMany({
+    where: { role: { in: ["RECEPTIONIST", "ADMIN"] } },
+    select: { id: true },
+  });
+  const staffIds = staff.map((s) => s.id);
+
+  if (staffIds.length > 0) {
+    const staffNotif = await createBulkNotifications({
+      senderId: provider.userId,
+      receiverIds: staffIds,
+      type: "emergency_cancellation",
+      message: EMERGENCY_CANCELLATION_STAFF_MESSAGE(provider.user.name, formattedDate),
+      relatedEntityId: providerId,
+      relatedEntityType: `emergency_cancel|${date}`,
+    });
+    if (staffNotif.success) notificationsSent += staffNotif.created;
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/calendar");
+
+  return { success: true, flagged: affectedAppointments.length, notificationsSent };
 }

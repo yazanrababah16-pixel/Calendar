@@ -46,6 +46,7 @@ import {
   Receipt,
   Stethoscope,
 } from "lucide-react";
+import { statusLabels, statusColors } from "@/lib/constants/appointment-status";
 import type { WorkflowEventInfo } from "@/lib/queries/appointments";
 
 function toLocalDatetimeString(utcIso: string): string {
@@ -103,28 +104,6 @@ type BookingModalProps = {
   scopedProviders?: Array<{ id: string; user: { name: string; email: string } }>;
   lockedProviderId?: string;
   lockedPatientId?: string;
-};
-
-const statusLabels: Record<string, string> = {
-  SCHEDULED: "Scheduled",
-  CONFIRMED: "Confirmed",
-  IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  NO_SHOW: "No Show",
-  NEEDS_RESCHEDULE: "Needs Reschedule",
-  RESCHEDULE_REQUESTED: "Reschedule Requested",
-};
-
-const statusColors: Record<string, string> = {
-  SCHEDULED: "text-blue-600 bg-blue-50",
-  CONFIRMED: "text-green-600 bg-green-50",
-  IN_PROGRESS: "text-amber-600 bg-amber-50",
-  COMPLETED: "text-gray-600 bg-gray-100",
-  CANCELLED: "text-red-600 bg-red-50",
-  NO_SHOW: "text-red-600 bg-red-50",
-  NEEDS_RESCHEDULE: "text-orange-600 bg-orange-50",
-  RESCHEDULE_REQUESTED: "text-purple-600 bg-purple-50",
 };
 
 export function BookingModal({
@@ -253,6 +232,13 @@ export function BookingModal({
   }, [open, resolvedPatientId, appointment, setValue]);
 
   const watchedColor = watch("color") || "#3b82f6";
+  const watchedStartTime = watch("startTime");
+  const watchedEndTime = watch("endTime");
+
+  const timeWarning =
+    watchedStartTime && watchedEndTime && new Date(watchedEndTime) <= new Date(watchedStartTime)
+      ? "End time must be after start time"
+      : null;
 
   const patientName =
     appointment && patients?.find((p) => p.id === appointment.patientId)?.user?.name;
@@ -658,6 +644,9 @@ export function BookingModal({
                 {errors.endTime && (
                   <p className="text-xs text-destructive">{errors.endTime.message}</p>
                 )}
+                {timeWarning && !errors.endTime && (
+                  <p className="text-xs text-amber-600">{timeWarning}</p>
+                )}
               </div>
             </div>
 
@@ -774,6 +763,9 @@ export function BookingModal({
                 <Input id="endTime" type="datetime-local" {...register("endTime")} />
                 {errors.endTime && (
                   <p className="text-xs text-destructive">{errors.endTime.message}</p>
+                )}
+                {timeWarning && !errors.endTime && (
+                  <p className="text-xs text-amber-600">{timeWarning}</p>
                 )}
               </div>
             </div>

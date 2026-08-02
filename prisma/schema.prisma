@@ -23,6 +23,7 @@ enum AppointmentStatus {
   NO_SHOW
   NEEDS_RESCHEDULE
   RESCHEDULE_REQUESTED
+  EMERGENCY_CANCELLED
 }
 
 enum WorkflowEventStatus {
