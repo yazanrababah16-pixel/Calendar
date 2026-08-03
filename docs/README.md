@@ -57,11 +57,12 @@ Telegram User
 
 ## Table of Contents
 
-| Document                                      | Description                                                                                                                       |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| [AI System Rules](ai_system_rules.md)         | Complete system prompt for the Telegram AI Agent — conversation flow, tool usage rules, privacy compliance, and response examples |
-| [n8n Configuration](n8n_configuration.md)     | Critical n8n setup notes — model selection, dummy tool parameters, workflow activation, and session memory mapping                |
-| [Troubleshooting Log](troubleshooting_log.md) | Errors encountered during development and their solutions — 404 model not found, dummy parameter crashes, Minimax balance issues  |
+| Document                                      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Flowchart](flowchart.md)                     | Mermaid.js visual diagrams of the full system architecture, data flow between n8n/Gemini/Backend, and the AI conversation decision tree                                                                                                                                                                                                                                                                                                                                                                                                                |
+| [AI System Rules](ai_system_rules.md)         | The complete finalized system prompt (225 lines) — 7 critical rules (no medical advice, professional tone, privacy), 9-step conversation flow (Step 0: Identify Patient through Step 8: Handle Response), tool usage mandates, error handling directives, session memory rules, and 12 response examples covering every scenario                                                                                                                                                                                                                       |
+| [n8n Configuration](n8n_configuration.md)     | 6 critical setup guides — selecting `gemini-flash-latest` via Expression mode to avoid 404 errors, the dummy parameter trick for tools with zero input (prevents Gemini `key cannot be empty` crash), activating the workflow via Publish menu for continuous background operation, mapping Window Buffer Memory Session ID to Telegram Chat ID for per-user conversation context, creating Telegram Bot API credentials, and configuring `NEXTJS_URL`/`AI_SYSTEM_PROMPT` environment variables. Includes a quick-reference table of all node settings |
+| [Troubleshooting Log](troubleshooting_log.md) | 9 documented errors with root causes and solutions — Gemini tool parameter crash (`key cannot be empty`), model 404 not found, Minimax insufficient balance, workflow not responding to live messages, AI losing conversation context between messages, misconfigured dummy parameter, Telegram bot not receiving messages, patient not found during linking, and 409 conflict on account linking. Each entry cross-links to the relevant n8n Configuration section. Includes an error-to-solution quick-reference map                                 |
 
 ---
 
@@ -77,6 +78,7 @@ Calendar/                          # Next.js backend
   src/app/api/availability/slots/  # Public slot availability (used by n8n)
   src/app/api/webhooks/n8n/        # n8n webhook endpoints (HMAC-signed)
   prisma/schema.prisma             # Database schema (Patient.telegramChatId)
+  docs/                            # This documentation folder
 
 n8nflow/                           # n8n workflow files (external folder)
   Telegram AI Booking Agent.json   # Main n8n workflow (importable)
