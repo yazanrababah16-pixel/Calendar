@@ -88,12 +88,13 @@ model User {
 }
 
 model Patient {
-  id          String   @id @default(uuid())
-  dateOfBirth DateTime? @db.Timestamptz()
-  phone       String   @unique
-  notes       String?
-  createdAt   DateTime @default(now()) @db.Timestamptz()
-  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz()
+  id              String   @id @default(uuid())
+  dateOfBirth     DateTime? @db.Timestamptz()
+  phone           String   @unique
+  telegramChatId  String?  @unique
+  notes           String?
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz()
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
