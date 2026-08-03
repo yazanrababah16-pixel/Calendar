@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 type Role = "ADMIN" | "PROVIDER" | "RECEPTIONIST" | "PATIENT";
 
 const roleRoutes: Record<string, Role[]> = {
-  "/dashboard/calendar": ["ADMIN", "PROVIDER", "RECEPTIONIST"],
+  "/dashboard/calendar": ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   "/dashboard/admin": ["ADMIN"],
   "/dashboard/appointments": ["ADMIN", "PROVIDER", "RECEPTIONIST", "PATIENT"],
   "/dashboard/patients": ["ADMIN", "PROVIDER", "RECEPTIONIST"],
