@@ -375,3 +375,20 @@ model BookingRequest {
   @@index([patientPhone])
   @@map("booking_requests")
 }
+
+model RegistrationRequest {
+  id             String   @id @default(uuid())
+  name           String
+  phone          String
+  email          String?
+  whatsappChatId String
+  status         String   @default("pending")
+  requestedAt    DateTime @default(now()) @db.Timestamptz()
+  reviewedAt     DateTime?
+  reviewedBy     String?
+
+  @@index([whatsappChatId])
+  @@index([phone])
+  @@index([status])
+  @@map("registration_requests")
+}
