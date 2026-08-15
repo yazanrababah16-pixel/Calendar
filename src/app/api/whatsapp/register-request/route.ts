@@ -20,7 +20,8 @@ const sql = neon(process.env.DATABASE_URL!);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, phone, email, whatsappChatId } = body;
+    const { name, phone, email } = body;
+    const whatsappChatId = body.whatsappChatId || body.whatsapp_chat_id;
 
     if (!name || typeof name !== "string" || name.trim().length < 2) {
       return NextResponse.json(
