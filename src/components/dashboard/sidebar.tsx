@@ -17,6 +17,7 @@ import {
   CalendarClock,
   MessageSquare,
   Bell,
+  UserPlus,
 } from "lucide-react";
 
 type NavItem = {
@@ -79,6 +80,12 @@ const navItems: NavItem[] = [
     labelKey: "nav.requests",
     href: "/dashboard/receptionist/requests",
     icon: MessageSquare,
+    roles: ["RECEPTIONIST", "ADMIN"],
+  },
+  {
+    labelKey: "nav.accountRequests",
+    href: "/dashboard/receptionist/account-requests",
+    icon: UserPlus,
     roles: ["RECEPTIONIST", "ADMIN"],
   },
   {
