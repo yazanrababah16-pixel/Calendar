@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
         name: string;
         phone: string;
         email: string | null;
-        whatsapp_chat_id: string;
+        whatsappChatId: string;
         status: string;
       }>
     >(
-      `SELECT id, name, phone, email, whatsapp_chat_id, status 
+      `SELECT id, name, phone, email, "whatsappChatId", status 
        FROM registration_requests 
        WHERE id = $1`,
       requestId,
@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
       await tx.$executeRawUnsafe(
         `UPDATE registration_requests 
          SET status = 'approved', 
-             reviewed_at = NOW(), 
-             reviewed_by = $1
+             "reviewedAt" = NOW(), 
+             "reviewedBy" = $1
          WHERE id = $2`,
         session.user.id,
         requestId,

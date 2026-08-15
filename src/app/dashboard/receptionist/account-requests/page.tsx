@@ -29,11 +29,11 @@ type RegistrationRequest = {
   name: string;
   phone: string;
   email: string | null;
-  whatsapp_chat_id: string;
+  whatsappChatId: string;
   status: string;
-  requested_at: string;
-  reviewed_at: string | null;
-  reviewed_by: string | null;
+  requestedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
 };
 
 export default function AccountRequestsPage() {
@@ -200,7 +200,7 @@ function AccountRequestsContent() {
                             <span className="text-xs font-medium">{req.name}</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground">
-                            {format(new Date(req.requested_at), "HH:mm")}
+                            {format(new Date(req.requestedAt), "HH:mm")}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 mb-1">
@@ -303,12 +303,12 @@ function AccountRequestsContent() {
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">WhatsApp Chat ID</p>
-                          <p className="font-medium text-xs">{selectedRequest.whatsapp_chat_id}</p>
+                          <p className="font-medium text-xs">{selectedRequest.whatsappChatId}</p>
                         </div>
                         <div className="col-span-2">
                           <p className="text-xs text-muted-foreground">Requested</p>
                           <p className="font-medium">
-                            {format(new Date(selectedRequest.requested_at), "MMM d, yyyy HH:mm")}
+                            {format(new Date(selectedRequest.requestedAt), "MMM d, yyyy HH:mm")}
                           </p>
                         </div>
                       </div>

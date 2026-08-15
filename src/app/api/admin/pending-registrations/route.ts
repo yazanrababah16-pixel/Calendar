@@ -20,14 +20,14 @@ export async function GET() {
       name,
       phone,
       email,
-      whatsapp_chat_id,
+      "whatsappChatId",
       status,
-      requested_at,
-      reviewed_at,
-      reviewed_by
+      "requestedAt",
+      "reviewedAt",
+      "reviewedBy"
     FROM registration_requests
     WHERE status = 'pending'
-    ORDER BY requested_at DESC
+    ORDER BY "requestedAt" DESC
   `;
 
   return NextResponse.json(requests);
