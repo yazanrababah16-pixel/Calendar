@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await sql`
-      INSERT INTO registration_requests (name, phone, email, whatsapp_chat_id, status)
+      INSERT INTO registration_requests (name, phone, email, "whatsappChatId", status)
       VALUES (
         ${name.trim()},
         ${normalizedPhone},
