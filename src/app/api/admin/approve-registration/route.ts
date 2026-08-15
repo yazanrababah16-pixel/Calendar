@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma/enums";
+import { triggerN8nWorkflow } from "@/server/actions/n8n";
+import { normalizePhone } from "@/lib/phone";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -120,6 +122,39 @@ export async function POST(request: NextRequest) {
 
       return { userId: user.id, patientId: patient.id };
     });
+
+    try {
+      const normalizedPhone = normalizePhone(phone);
+      const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://calendar-beige-eight.vercel.app"}/login`;
+      const arabicMessage = `مرحباً ${name.trim()}،
+
+تم إنشاء حسابك في العيادة بنجاح! 🎉
+
+يمكنك الآن:
+• حجز مواعيد جديدة
+• متابعة حالة مواعيدك
+• إدارة زيارتك للعيادة
+
+بيانات الدخول:
+📧 البريد الإلكتروني: ${finalEmail}
+🔑 كلمة المرور: ${defaultPassword}
+
+رابط تسجيل الدخول: ${loginUrl}
+
+يمكنك تغيير كلمة المرور بعد تسجيل الدخول لأول مرة.
+
+نتطلع لرؤيتك!`;
+
+      triggerN8nWorkflow("whatsapp-account-created", {
+        patientPhone: normalizedPhone,
+        patientName: name.trim(),
+        email: finalEmail,
+        password: defaultPassword,
+        message: arabicMessage,
+      }).catch(() => {});
+    } catch (whatsappError) {
+      console.error("[approve-registration] WhatsApp notification failed:", whatsappError);
+    }
 
     return NextResponse.json({
       success: true,
