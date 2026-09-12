@@ -36,6 +36,11 @@ Expert PostgreSQL developer. Safe migrations, parameterized queries, proper inde
 - statement_timeout to prevent runaway queries
 - SELECT ... FOR UPDATE for row locking
 
+## SSL Configuration
+- Use `sslmode=verify-full` for all PostgreSQL connections (required for Neon, Vercel Postgres, and cloud providers)
+- `sslmode=require` is deprecated and triggers library warnings; always use `verify-full`
+- Ensure connection strings in `.env`, scripts, and CI use the updated sslmode
+
 ## Forbidden
 - No SELECT *
 - No string-interpolated SQL

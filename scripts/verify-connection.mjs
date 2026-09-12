@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 const urls = {
   pooled:
     process.env.DATABASE_URL ||
-    "postgresql://neondb_owner:npg_AvCF1DO0Wlmq@ep-rapid-king-awkbvf7a-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
+    "postgresql://neondb_owner:npg_AvCF1DO0Wlmq@ep-rapid-king-awkbvf7a-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=verify-full&channel_binding=require",
   direct:
     process.env.DIRECT_DATABASE_URL ||
-    "postgresql://neondb_owner:npg_AvCF1DO0Wlmq@ep-rapid-king-awkbvf7a.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require",
+    "postgresql://neondb_owner:npg_AvCF1DO0Wlmq@ep-rapid-king-awkbvf7a.c-12.us-east-1.aws.neon.tech/neondb?sslmode=verify-full",
 };
 
 console.log("=== Testing Database Connections ===\n");
